@@ -14,9 +14,15 @@ GITLAB_IMAGE="${GITLAB_IMAGE:-gitlab/gitlab-ce:19.4.5-ce.0}"
 RUNNER_IMAGE="${RUNNER_IMAGE:-gitlab/gitlab-runner:alpine-v19.4.2}"
 
 # One name that the host browser, the runner, job containers and (later) the staging VM
-# can all resolve. Docker Desktop writes host.docker.internal into the host's hosts file
-# and resolves it inside containers; on Linux we add it with host-gateway.
-GITLAB_HOST="${GITLAB_HOST:-host.docker.internal}"
+# all use for GitLab and its registry. It resolves to:
+#   host            127.0.0.1, via one line in the hosts file (see preflight)
+#   GitLab itself   127.0.0.1 (--add-host)
+#   runner + jobs   the Docker host gateway (--add-host / extra_hosts host-gateway)
+#   staging VM      the hypervisor's address for the host (Task 3)
+# host.docker.internal was rejected: Docker Desktop pins it to the host's LAN address in
+# the hosts file, which goes stale when the network changes and is absent offline.
+GITLAB_HOST="${GITLAB_HOST:-gitlab.northwind.test}"
+GITLAB_BIND="${GITLAB_BIND:-127.0.0.1}"   # host address the published ports listen on
 GITLAB_PORT="${GITLAB_PORT:-8929}"
 REGISTRY_PORT="${REGISTRY_PORT:-5050}"
 GITLAB_URL="http://${GITLAB_HOST}:${GITLAB_PORT}"

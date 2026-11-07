@@ -29,10 +29,19 @@ log "Preflight"
 docker info >/dev/null 2>&1 || die "Docker daemon is not reachable"
 mem=$(docker info --format '{{.MemTotal}}')
 (( mem >= 7 * 1024 * 1024 * 1024 )) || warn "Docker has $((mem / 1024 / 1024)) MiB; GitLab wants ~4 GiB on its own"
-if ! "$PY" -c "import socket,sys; socket.gethostbyname(sys.argv[1])" "$GITLAB_HOST" 2>/dev/null; then
-  die "$GITLAB_HOST does not resolve on this host. On Linux add '127.0.0.1 $GITLAB_HOST' to /etc/hosts"
+resolved=$("$PY" -c "import socket,sys; print(socket.gethostbyname(sys.argv[1]))" "$GITLAB_HOST" 2>/dev/null || true)
+if [[ "$resolved" != 127.* ]]; then
+  warn "$GITLAB_HOST resolves to '${resolved:-nothing}', expected 127.0.0.1. Add it to the hosts file once:"
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      warn "  (PowerShell as Administrator)"
+      warn "  Add-Content \$env:SystemRoot\System32\drivers\etc\hosts \"\`n127.0.0.1 $GITLAB_HOST\"" ;;
+    *)
+      warn "  echo '127.0.0.1 $GITLAB_HOST' | sudo tee -a /etc/hosts" ;;
+  esac
+  die "hosts entry missing"
 fi
-ok "docker up, $GITLAB_HOST resolves"
+ok "docker up, $GITLAB_HOST -> $resolved"
 
 # --------------------------------------------------------------------------- network
 if ! docker network inspect "$NETWORK" >/dev/null 2>&1; then
@@ -63,19 +72,32 @@ gitlab_kas['enable'] = false
 letsencrypt['enable'] = false
 EOF
 
+# Settings are fixed when the container is created, so a change of image, name or
+# ports means recreating it. The data volumes survive.
+GITLAB_CONFIG_HASH=$(printf '%s|%s|%s' "$GITLAB_IMAGE" "$GITLAB_BIND" "$OMNIBUS" | "$PY" -c 'import hashlib,sys;print(hashlib.sha256(sys.stdin.buffer.read()).hexdigest()[:16])')
+if [ -n "$(container_state "$GITLAB_CONTAINER")" ]; then
+  current_hash=$(docker inspect -f '{{index .Config.Labels "devsecops.config-hash"}}' "$GITLAB_CONTAINER")
+  if [ "$current_hash" != "$GITLAB_CONFIG_HASH" ]; then
+    warn "GitLab container settings changed; recreating it (data volumes are kept)"
+    docker rm -f "$GITLAB_CONTAINER" >/dev/null
+  fi
+fi
+
 case "$(container_state "$GITLAB_CONTAINER")" in
   "")
     log "Starting GitLab ($GITLAB_IMAGE)"
     # Inside the container the public name points at itself, so GitLab's calls to its
     # own external_url (registry auth, webhooks) never leave the container.
+    # Ports are published on loopback only: nothing on the LAN can reach this GitLab.
     docker run -d --name "$GITLAB_CONTAINER" \
+      --label "devsecops.config-hash=$GITLAB_CONFIG_HASH" \
       --hostname "$GITLAB_HOST" \
       --network "$NETWORK" \
       --restart unless-stopped \
       --shm-size 256m \
       --add-host "$GITLAB_HOST:127.0.0.1" \
-      -p "${GITLAB_PORT}:${GITLAB_PORT}" \
-      -p "${REGISTRY_PORT}:${REGISTRY_PORT}" \
+      -p "${GITLAB_BIND}:${GITLAB_PORT}:${GITLAB_PORT}" \
+      -p "${GITLAB_BIND}:${REGISTRY_PORT}:${REGISTRY_PORT}" \
       -e GITLAB_ROOT_PASSWORD="$(cat "$ROOT_PASSWORD_FILE")" \
       -e GITLAB_OMNIBUS_CONFIG="$OMNIBUS" \
       -v gitlab-config:/etc/gitlab \
