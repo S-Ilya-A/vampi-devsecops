@@ -34,6 +34,11 @@ GITLAB_CONTAINER="${GITLAB_CONTAINER:-gitlab}"
 RUNNER_CONTAINER="${RUNNER_CONTAINER:-gitlab-runner}"
 RUNNER_CONCURRENCY="${RUNNER_CONCURRENCY:-2}"
 
+MIRROR_IMAGE="${MIRROR_IMAGE:-registry:2.8.3}"
+MIRROR_CONTAINER="${MIRROR_CONTAINER:-docker-mirror}"
+MIRROR_PORT="${MIRROR_PORT:-5051}"
+MIRROR_URL="http://${GITLAB_HOST}:${MIRROR_PORT}"
+
 PROJECT_PATH="${PROJECT_PATH:-vampi-devsecops}"
 
 # Local traffic must not go through a corporate/desktop HTTP proxy.

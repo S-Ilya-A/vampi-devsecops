@@ -51,6 +51,25 @@ else
   ok "network $NETWORK exists"
 fi
 
+# --------------------------------------------------------------------------- Docker Hub mirror
+# Each dind service starts with an empty image store, so every build used to pull its
+# base images from Docker Hub. This pull-through cache keeps them locally after the
+# first pull. CI jobs find it through the DOCKER_REGISTRY_MIRROR instance variable.
+case "$(container_state "$MIRROR_CONTAINER")" in
+  "")
+    log "Starting Docker Hub pull-through cache ($MIRROR_IMAGE)"
+    docker run -d --name "$MIRROR_CONTAINER" \
+      --network "$NETWORK" \
+      --restart unless-stopped \
+      -p "${GITLAB_BIND}:${MIRROR_PORT}:5000" \
+      -e REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io \
+      -v docker-mirror-data:/var/lib/registry \
+      "$MIRROR_IMAGE" >/dev/null
+    ;;
+  running) ok "Docker Hub mirror already running" ;;
+  *) docker start "$MIRROR_CONTAINER" >/dev/null ;;
+esac
+
 # --------------------------------------------------------------------------- GitLab
 ROOT_PASSWORD_FILE=$(secret_file root-password)
 
@@ -140,6 +159,18 @@ else
   token_valid || die "token was created but the API rejects it"
   ok "root API token stored in .local/root-token"
 fi
+
+# --------------------------------------------------------------------------- instance CI variables
+# set_instance_var <key> <value>: create or update an instance-level CI/CD variable
+set_instance_var() {
+  if api GET "/admin/ci/variables/$1" >/dev/null 2>&1; then
+    api PUT "/admin/ci/variables/$1" --data-urlencode "value=$2" >/dev/null
+  else
+    api POST /admin/ci/variables --data-urlencode "key=$1" --data-urlencode "value=$2" >/dev/null
+  fi
+}
+set_instance_var DOCKER_REGISTRY_MIRROR "$MIRROR_URL"
+ok "instance variable DOCKER_REGISTRY_MIRROR=$MIRROR_URL"
 
 # --------------------------------------------------------------------------- runner
 case "$(container_state "$RUNNER_CONTAINER")" in

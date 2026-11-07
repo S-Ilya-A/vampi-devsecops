@@ -36,22 +36,43 @@ frontend-check:
     - name: docker:20.10.16-dind
       # The local GitLab registry is plain HTTP. The runner does not expand variables
       # in services:command, so expand $CI_REGISTRY inside the service container.
-      entrypoint: ["sh", "-c", 'exec dockerd-entrypoint.sh --insecure-registry="$CI_REGISTRY"']
+      # DOCKER_REGISTRY_MIRROR (instance variable, optional) is a local Docker Hub cache.
+      entrypoint:
+        - sh
+        - -c
+        - >-
+          exec dockerd-entrypoint.sh --insecure-registry="$CI_REGISTRY"
+          ${DOCKER_REGISTRY_MIRROR:+--registry-mirror="$DOCKER_REGISTRY_MIRROR"}
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
+    DOCKER_BUILDKIT: "1"
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  # Every dind starts empty, so reuse layers from the registry. Inline cache only covers
+  # the final stage, so the build stage is pushed separately as :cache-build. Unchanged
+  # dependencies then mean no apk/pip/npm downloads, and the build works offline.
+  script:
+    - >-
+      docker build --target "$BUILD_STAGE" --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from "$IMAGE:cache-build" -t "$IMAGE:cache-build" "$CONTEXT"
+    - >-
+      docker build --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from "$IMAGE:cache-build" --cache-from "$IMAGE:latest"
+      -t "$IMAGE:$CI_COMMIT_SHORT_SHA" -t "$IMAGE:latest" "$CONTEXT"
+    - docker push "$IMAGE:cache-build"
+    - docker push "$IMAGE:$CI_COMMIT_SHORT_SHA"
+    - docker push "$IMAGE:latest"
 
 build-api:
   extends: .docker-build
-  script:
-    - docker build -t "$API_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$API_IMAGE:latest" .
-    - docker push "$API_IMAGE:$CI_COMMIT_SHORT_SHA"
-    - docker push "$API_IMAGE:latest"
+  variables:
+    IMAGE: $API_IMAGE
+    CONTEXT: .
+    BUILD_STAGE: builder
 
 build-frontend:
   extends: .docker-build
-  script:
-    - docker build -t "$FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$FRONTEND_IMAGE:latest" frontend
-    - docker push "$FRONTEND_IMAGE:$CI_COMMIT_SHORT_SHA"
-    - docker push "$FRONTEND_IMAGE:latest"
+  variables:
+    IMAGE: $FRONTEND_IMAGE
+    CONTEXT: frontend
+    BUILD_STAGE: build
