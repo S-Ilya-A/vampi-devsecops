@@ -6,3 +6,4 @@ sqlalchemy==2.0.2
 swagger-ui-bundle
 PyJWT==2.6.0
 markupsafe==2.1.2
+psycopg2-binary==2.9.5

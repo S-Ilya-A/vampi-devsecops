@@ -6,7 +6,10 @@ from connexion.exceptions import ProblemException
 
 vuln_app = connexion.App(__name__, specification_dir='./openapi_specs')
 
-SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(vuln_app.app.root_path, 'database/database.db')
+# DATABASE_URL points at Postgres in docker-compose / CI; local runs fall back to SQLite
+SQLALCHEMY_DATABASE_URI = os.getenv(
+    'DATABASE_URL',
+    'sqlite:///' + os.path.join(vuln_app.app.root_path, 'database/database.db'))
 vuln_app.app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
 vuln_app.app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
