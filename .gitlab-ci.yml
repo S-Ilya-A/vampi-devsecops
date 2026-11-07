@@ -34,8 +34,9 @@ frontend-check:
   image: docker:20.10.16
   services:
     - name: docker:20.10.16-dind
-      # the local GitLab registry is plain HTTP
-      command: ["--insecure-registry=$CI_REGISTRY"]
+      # The local GitLab registry is plain HTTP. The runner does not expand variables
+      # in services:command, so expand $CI_REGISTRY inside the service container.
+      entrypoint: ["sh", "-c", 'exec dockerd-entrypoint.sh --insecure-registry="$CI_REGISTRY"']
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
   before_script:
