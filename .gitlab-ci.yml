@@ -36,15 +36,18 @@ frontend-check:
     - name: docker:20.10.16-dind
       # The local GitLab registry is plain HTTP. The runner does not expand variables
       # in services:command, so expand $CI_REGISTRY inside the service container.
-      # DOCKER_REGISTRY_MIRROR (instance variable, optional) is a local Docker Hub cache.
+      # DIND_REGISTRY_MIRROR (optional) is a local Docker Hub cache.
       entrypoint:
         - sh
         - -c
         - >-
           exec dockerd-entrypoint.sh --insecure-registry="$CI_REGISTRY"
-          ${DOCKER_REGISTRY_MIRROR:+--registry-mirror="$DOCKER_REGISTRY_MIRROR"}
+          ${DIND_REGISTRY_MIRROR:+--registry-mirror="$DIND_REGISTRY_MIRROR"}
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
+    # Instance-level variables are not passed to service containers; variables
+    # declared here are. Empty when the instance does not define a mirror.
+    DIND_REGISTRY_MIRROR: $DOCKER_REGISTRY_MIRROR
     # Classic builder on purpose: BuildKit in Docker 20.10 ignores --insecure-registry
     # and --registry-mirror, so remote cache and the mirror never worked with it.
     DOCKER_BUILDKIT: "0"
