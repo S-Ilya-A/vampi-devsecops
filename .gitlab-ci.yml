@@ -17,16 +17,30 @@ unit-tests:
     POSTGRES_USER: vampi
     POSTGRES_PASSWORD: vampi
     DATABASE_URL: postgresql://vampi:vampi@db:5432/vampi
+  # A cached virtualenv per requirements.txt: on a cache hit nothing is downloaded,
+  # so the job also runs offline. (pip's own cache still queries the index.)
+  cache:
+    key:
+      files: [requirements.txt]
+      prefix: venv-py311
+    paths: [.venv/]
   script:
-    - pip install -r requirements.txt pytest==7.2.1
+    - test -x .venv/bin/python || python -m venv .venv
+    - . .venv/bin/activate
+    - pip install -q -r requirements.txt pytest==7.2.1
     - python -m pytest -v tests/
 
 frontend-check:
   stage: test
   image: node:14
+  cache:
+    key:
+      files: [frontend/package-lock.json]
+      prefix: node14
+    paths: [frontend/node_modules/]
   script:
     - cd frontend
-    - npm install
+    - npm install --prefer-offline --no-audit --no-fund
     - npm test
 
 .docker-build:
