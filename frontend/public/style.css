@@ -1,0 +1,9 @@
+body { font-family: Arial, sans-serif; max-width: 760px; margin: 0 auto; padding: 16px; color: #222; }
+header { display: flex; justify-content: space-between; align-items: baseline; }
+h1 { color: #6b2d8f; }
+form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+input { flex: 1 1 160px; padding: 8px; }
+button { padding: 8px 16px; background: #6b2d8f; color: #fff; border: 0; cursor: pointer; }
+#message { min-height: 1.5em; color: #a33; }
+pre { background: #f4f4f4; padding: 8px; white-space: pre-wrap; }
+footer { margin-top: 48px; color: #888; font-size: 12px; }

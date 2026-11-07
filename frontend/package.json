@@ -1,0 +1,16 @@
+{
+  "name": "vampi-frontend",
+  "version": "1.0.0",
+  "description": "Static web client for the VAmPI books API",
+  "private": true,
+  "scripts": {
+    "vendor": "mkdir -p public/vendor && cp node_modules/jquery/dist/jquery.min.js node_modules/lodash/lodash.min.js node_modules/moment/min/moment.min.js public/vendor/",
+    "test": "node --check public/app.js"
+  },
+  "dependencies": {
+    "jquery": "3.4.1",
+    "lodash": "4.17.15",
+    "moment": "2.24.0"
+  },
+  "license": "MIT"
+}

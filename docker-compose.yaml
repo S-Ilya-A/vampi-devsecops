@@ -1,18 +1,43 @@
 services:
- vampi-secure:
-  build: ./
-  container_name: vampi-secure
-  ports:
-   - 5001:5000
-  environment:
-   - vulnerable=0
-   - tokentimetolive=3600
+  db:
+    image: postgres:15
+    container_name: vampi-db
+    environment:
+      - POSTGRES_DB=vampi
+      - POSTGRES_USER=vampi
+      - POSTGRES_PASSWORD=vampi
+    ports:
+      - 5432:5432
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vampi -d vampi"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
- vampi-vulnerable:
-  build: ./
-  container_name: vampi-vulnerable
-  ports:
-   - 5002:5000
-  environment:
-   - vulnerable=1
-   - tokentimetolive=3600
+  api:
+    build: ./
+    image: ${API_IMAGE:-vampi-api:local}
+    container_name: vampi-api
+    ports:
+      - 5000:5000
+    environment:
+      - vulnerable=1
+      - tokentimetolive=3600
+      - DATABASE_URL=postgresql://vampi:vampi@db:5432/vampi
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    image: ${FRONTEND_IMAGE:-vampi-frontend:local}
+    container_name: vampi-frontend
+    ports:
+      - 8088:80
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

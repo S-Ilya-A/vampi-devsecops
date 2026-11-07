@@ -2,3 +2,7 @@ Dockerfile
 .dockerignore
 README.md
 docker-compose.yaml
+frontend/
+docs/
+tests/
+.git/
