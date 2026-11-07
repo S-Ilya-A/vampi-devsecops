@@ -1,4 +1,6 @@
 """Smoke tests for the API. Need a database: DATABASE_URL (Postgres in CI) or the SQLite fallback."""
+import random
+
 import pytest
 
 from config import vuln_app
@@ -6,6 +8,10 @@ from config import vuln_app
 
 @pytest.fixture(scope="module")
 def client():
+    # /createdb gives each seed user a book titled "bookTitle<randrange(100)>" and
+    # book_title is unique, so ~3% of runs collide and return 500 (upstream bug).
+    # A fixed seed makes the seed data deterministic: 49, 97, 53.
+    random.seed(0)
     c = vuln_app.app.test_client()
     r = c.get("/createdb")
     assert r.status_code == 200
