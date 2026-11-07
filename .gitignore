@@ -95,3 +95,6 @@ venv.bak/
 .mypy_cache/
 
 .idea/
+
+# generated secrets and state from scripts/
+.local/
