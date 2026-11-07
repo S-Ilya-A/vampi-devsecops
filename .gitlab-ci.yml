@@ -33,7 +33,9 @@ frontend-check:
   stage: build
   image: docker:20.10.16
   services:
-    - docker:20.10.16-dind
+    - name: docker:20.10.16-dind
+      # the local GitLab registry is plain HTTP
+      command: ["--insecure-registry=$CI_REGISTRY"]
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
   before_script:
