@@ -1,3 +1,8 @@
+> **Fork for a DevSecOps assignment.** This repository is VAmPI with Postgres, a JavaScript
+> web client and a GitLab CI pipeline added. See [`ASSIGNMENT.md`](ASSIGNMENT.md) and
+> [`docs/BASELINE.md`](docs/BASELINE.md). Quick start: `docker compose up --build`, then
+> `curl localhost:5000/createdb` and open http://localhost:8088.
+
 # VAmPI
 **The Vulnerable API** *(Based on OpenAPI 3)*
 ![vampi](https://i.imgur.com/zR0quKf.jpg)
