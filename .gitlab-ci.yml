@@ -45,18 +45,22 @@ frontend-check:
           ${DOCKER_REGISTRY_MIRROR:+--registry-mirror="$DOCKER_REGISTRY_MIRROR"}
   variables:
     DOCKER_TLS_CERTDIR: "/certs"
-    DOCKER_BUILDKIT: "1"
+    # Classic builder on purpose: BuildKit in Docker 20.10 ignores --insecure-registry
+    # and --registry-mirror, so remote cache and the mirror never worked with it.
+    DOCKER_BUILDKIT: "0"
   before_script:
     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
-  # Every dind starts empty, so reuse layers from the registry. Inline cache only covers
-  # the final stage, so the build stage is pushed separately as :cache-build. Unchanged
-  # dependencies then mean no apk/pip/npm downloads, and the build works offline.
+  # Every dind starts empty, so seed its cache from the registry. The build stage is
+  # pushed separately as :cache-build so its layers (apk/pip/npm) are reused too.
+  # Unchanged dependencies then mean no package downloads, and the build works offline.
   script:
+    - docker pull "$IMAGE:cache-build" || true
+    - docker pull "$IMAGE:latest" || true
     - >-
-      docker build --target "$BUILD_STAGE" --build-arg BUILDKIT_INLINE_CACHE=1
+      docker build --target "$BUILD_STAGE"
       --cache-from "$IMAGE:cache-build" -t "$IMAGE:cache-build" "$CONTEXT"
     - >-
-      docker build --build-arg BUILDKIT_INLINE_CACHE=1
+      docker build
       --cache-from "$IMAGE:cache-build" --cache-from "$IMAGE:latest"
       -t "$IMAGE:$CI_COMMIT_SHORT_SHA" -t "$IMAGE:latest" "$CONTEXT"
     - docker push "$IMAGE:cache-build"
