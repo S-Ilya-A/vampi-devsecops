@@ -6,7 +6,8 @@ set -euo pipefail
 # Git Bash on Windows rewrites arguments that look like paths (/etc/gitlab -> C:/...).
 export MSYS_NO_PATHCONV=1
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# pwd -W (Git Bash) gives C:/... which native Windows tools accept without conversion.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && { pwd -W 2>/dev/null || pwd; })"
 STATE_DIR="${STATE_DIR:-$REPO_ROOT/.local}"   # generated secrets, git-ignored
 
 # Pinned images: a re-run never needs the network once these are pulled.
@@ -58,7 +59,7 @@ json_get() {
   "$PY" -c 'import json,sys
 d=json.load(sys.stdin)
 v=eval(sys.argv[1])
-print("" if v is None else v)' "$1"
+sys.stdout.buffer.write(("" if v is None else str(v)).encode() + b"\n")' "$1"
 }
 
 container_state() {  # prints running|exited|... or nothing if it does not exist
@@ -83,12 +84,22 @@ wait_until() {
   done
 }
 
+# json_get and rand_str write raw bytes: on Windows print() emits CRLF and $(...) keeps the CR.
+
+# rand_str <length>: random letters and digits.
+# (tr </dev/urandom | head would exit 141 on SIGPIPE under pipefail.)
+rand_str() {
+  "$PY" -c 'import secrets,string,sys
+a=string.ascii_letters+string.digits
+sys.stdout.buffer.write("".join(secrets.choice(a) for _ in range(int(sys.argv[1]))).encode())' "$1"
+}
+
 secret_file() {  # secret_file <name>: create a random secret once, print its path
   local f="$STATE_DIR/$1"
   if [ ! -s "$f" ]; then
     mkdir -p "$STATE_DIR"
     # letters+digits only, plus a fixed suffix to satisfy GitLab's complexity rules
-    printf '%s' "$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)Aa1!" >"$f"
+    printf '%s' "$(rand_str 24)Aa1!" >"$f"
     chmod 600 "$f" 2>/dev/null || true
   fi
   printf '%s' "$f"

@@ -121,7 +121,7 @@ if token_valid; then
 else
   log "Creating root personal access token (rails runner, ~1 min)"
   mkdir -p "$STATE_DIR"
-  new_token="glpat-$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24)"
+  new_token="glpat-$(rand_str 24)"
   docker exec -e NEW_TOKEN="$new_token" "$GITLAB_CONTAINER" gitlab-rails runner '
     u = User.find_by_username!("root")
     u.personal_access_tokens.active.where(name: "devsecops-bootstrap").each(&:revoke!)
@@ -158,7 +158,7 @@ case "$(container_state "$RUNNER_CONTAINER")" in
 esac
 
 runner_registered() {
-  docker exec "$RUNNER_CONTAINER" grep -q 'token = "glrt-' /etc/gitlab-runner/config.toml &&
+  docker exec "$RUNNER_CONTAINER" grep -qs 'token = "glrt-' /etc/gitlab-runner/config.toml &&
     docker exec "$RUNNER_CONTAINER" gitlab-runner verify 2>&1 | grep -q 'is valid'
 }
 if runner_registered; then
