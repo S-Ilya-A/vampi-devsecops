@@ -1,0 +1,169 @@
+Trend report  since 2026-11-07T19:21:30+00:00  ref master  (generated 2026-11-09T19:21:30+00:00)
+
+== Findings per tool per pipeline run  (- = no complete report from that tool)
+pipeline  time (UTC)        commit    ref     semgrep  gitleaks  grype  trivy  zap
+--------  ----------------  --------  ------  -------  --------  -----  -----  ---
+31        2026-11-09 18:58  eb27aab8  master       16         1     18     94  104
+30        2026-11-09 18:30  fb01723a  master       19         1     24   1053  107
+29        2026-11-09 18:05  1242c6c7  master       18         1     24   1053  122
+
+== Severity distribution, newest run (#31)
+tool      critical  high  medium  low  info
+--------  --------  ----  ------  ---  ----
+semgrep          0     8       8    0     0
+gitleaks         0     1       0    0     0
+grype            1     7       8    2     0
+trivy            2    18      24   50     0
+zap              0     1       6   52    45
+
+== Severity distribution, all runs in the window
+tool      critical  high  medium  low  info
+--------  --------  ----  ------  ---  ----
+semgrep          0    29      24    0     0
+gitleaks         0     3       0    0     0
+grype            3    29      28    6     0
+trivy           66   554     868  684    28
+zap              0     8      19  181   125
+
+== Changes between runs
+#30 -> #31: 85 new, 148 recurring, 1056 resolved
+tool      new  recurring  resolved
+--------  ---  ---------  --------
+gitleaks    0          1         0
+grype       3         15         9
+semgrep     0         16         3
+trivy      57         37      1016
+zap        25         79        28
+
+New (most severe first):
+severity  scan            finding                                                       location
+--------  --------------  ------------------------------------------------------------  ---------------------------------
+critical  image:frontend  brotli: Out-of-Bounds Write in Google Brotli Decoder          alpine 3.24.2
+high      image:frontend  curl: curl: HTTP/2 upload Use-After-Free                      alpine 3.24.2
+high      image:frontend  curl: curl: HTTP/2 upload Use-After-Free                      alpine 3.24.2
+high      image:frontend  expat: expat: Denial of Service via NULL pointer dereference  alpine 3.24.2
+high      image:frontend  expat: expat: Denial of Service via delayed entity amplifica  alpine 3.24.2
+high      image:frontend  expat: expat: Denial of Service via improper memory tracking  alpine 3.24.2
+high      image:frontend  expat: expat: Denial of Service via integer overflow during   alpine 3.24.2
+high      image:frontend  musl: musl: Arbitrary code execution via integer overflow in  alpine 3.24.2
+high      image:frontend  musl: musl: Arbitrary code execution via integer overflow in  alpine 3.24.2
+high      image:frontend  zlib: zlib: Heap buffer overflow in gz_vacate() allows arbit  alpine 3.24.2
+high      sca             GHSA-r5fr-rjxr-66jc in lodash 4.17.21                         /frontend/package-lock.json
+medium    dast:api        Buffer Overflow                                               POST /users/v1/register
+medium    dast:api        Buffer Overflow                                               PUT /users/v1/{username}/password
+medium    dast:api        Buffer Overflow                                               POST /books/v1
+medium    dast:api        Format String Error                                           PUT /users/v1/{username}/password
+medium    dast:api        Format String Error                                           POST /books/v1
+medium    dast:api        Format String Error                                           POST /users/v1/register
+medium    image:frontend  Improper Restriction of Operations within the Bounds of a Me  alpine 3.24.2
+medium    image:frontend  curl: curl: FTP wildcard write callback mixup                 alpine 3.24.2
+medium    image:frontend  curl: curl: FTP wildcard write callback mixup                 alpine 3.24.2
+medium    sca             GHSA-4p3w-j4w9-5jqw in moment 2.30.1                          /frontend/package-lock.json
+medium    sca             GHSA-xxjr-mmjv-4gpg in lodash 4.17.21                         /frontend/package-lock.json
+low       dast:api        Insufficient Site Isolation Against Spectre Vulnerability     GET /books/v1/{book_title}
+low       dast:api        Unexpected Content-Type was returned                          GET /books/v1/{book_title}
+low       dast:api        X-Content-Type-Options Header Missing                         GET /books/v1/{book_title}
+low       dast:api        ZAP is Out of Date                                            GET /me
+low       dast:web        Insufficient Site Isolation Against Spectre Vulnerability     GET /app.js
+low       dast:web        Insufficient Site Isolation Against Spectre Vulnerability     GET /robots.txt
+low       dast:web        Insufficient Site Isolation Against Spectre Vulnerability     GET /
+low       dast:web        Insufficient Site Isolation Against Spectre Vulnerability     GET /style.css
+low       dast:web        Insufficient Site Isolation Against Spectre Vulnerability     GET /sitemap.xml
+low       dast:web        ZAP is Out of Date                                            GET /style.css
+low       image:frontend  curl: IMAP APPEND plus CRLF conversion command injection      alpine 3.24.2
+low       image:frontend  curl: IMAP APPEND plus CRLF conversion command injection      alpine 3.24.2
+low       image:frontend  curl: curl: -J no-clobber guarantee bypassed with 103 early   alpine 3.24.2
+low       image:frontend  curl: curl: -J no-clobber guarantee bypassed with 103 early   alpine 3.24.2
+low       image:frontend  curl: curl: Authorization: Negotiate sent to foreign origin   alpine 3.24.2
+low       image:frontend  curl: curl: Authorization: Negotiate sent to foreign origin   alpine 3.24.2
+low       image:frontend  curl: curl: FTP connection reuse inherits client-certificate  alpine 3.24.2
+low       image:frontend  curl: curl: FTP connection reuse inherits client-certificate  alpine 3.24.2
+
+Resolved (most severe first):
+severity  scan                 finding                                                       location
+--------  -------------------  ------------------------------------------------------------  -------------------------
+critical  image:frontend       FreeType: Buffer overflow in sfnt_init_face                   debian 11.3
+critical  image:frontend       brotli: Out-of-Bounds Write in Google Brotli Decoder          debian 11.3
+critical  image:frontend       curl: HSTS ignored on multiple requests                       debian 11.3
+critical  image:frontend       curl: HSTS ignored on multiple requests                       debian 11.3
+critical  image:frontend       curl: POST following PUT confusion                            debian 11.3
+critical  image:frontend       curl: POST following PUT confusion                            debian 11.3
+critical  image:frontend       curl: Unpreserved file permissions                            debian 11.3
+critical  image:frontend       curl: Unpreserved file permissions                            debian 11.3
+critical  image:frontend       curl: heap based buffer overflow in the SOCKS5 proxy handsha  debian 11.3
+critical  image:frontend       curl: heap based buffer overflow in the SOCKS5 proxy handsha  debian 11.3
+critical  image:frontend       curl: use-after-free and double-free in MQTT sending          debian 11.3
+critical  image:frontend       curl: use-after-free and double-free in MQTT sending          debian 11.3
+critical  image:frontend       gnutls: GnuTLS: Denial of Service via DTLS zero-length fragm  debian 11.3
+critical  image:frontend       gnutls: gnutls: Authentication Bypass via NUL Character in U  debian 11.3
+critical  image:frontend       krb5: GSS message token handling                              debian 11.3
+critical  image:frontend       krb5: GSS message token handling                              debian 11.3
+critical  image:frontend       krb5: GSS message token handling                              debian 11.3
+critical  image:frontend       krb5: GSS message token handling                              debian 11.3
+critical  image:frontend       libexpat: Integer Overflow or Wraparound                      debian 11.3
+critical  image:frontend       libexpat: integer overflow                                    debian 11.3
+critical  image:frontend       libtasn1: Out-of-bound access in ETYPE_OK                     debian 11.3
+critical  image:frontend       libxml2: Use-After-Free in libxml2                            debian 11.3
+critical  image:frontend       libxml2: mingw-libxml2: libxml2: Denial of Service via craft  debian 11.3
+critical  image:frontend       pcre2: Out-of-bounds read in compile_xclass_matchingpath in   debian 11.3
+critical  image:frontend       pcre2: Out-of-bounds read in get_recurse_data_length in pcre  debian 11.3
+critical  image:frontend       perl-archive-tar: perl-archive-tar: Path traversal via craft  debian 11.3
+critical  image:frontend       perl: Perl: Heap buffer overflow when compiling regular expr  debian 11.3
+critical  image:frontend       perl: Perl: Incorrect regular expression processing via larg  debian 11.3
+critical  image:frontend       sqlite: heap out-of-bound read in function rtreenode()        debian 11.3
+critical  image:frontend       zlib: heap-based buffer over-read and overflow in inflate()   debian 11.3
+critical  image:frontend       zlib: integer overflow and resultant heap-based buffer overf  debian 11.3
+high      dast:api             SQL Injection                                                 POST /users/v1/login
+high      dast:api             SQL Injection                                                 GET /users/v1/{username}
+high      dast:web             Vulnerable JS Library                                         GET /vendor/moment.min.js
+high      dockerfile:api       Image user should not be 'root'                               Dockerfile
+high      dockerfile:frontend  Image user should not be 'root'                               Dockerfile
+high      image:frontend       FreeType: Segmentation violation via FNT_Size_Request         debian 11.3
+high      image:frontend       Freetype: Segmentation violation via FT_Request_Size          debian 11.3
+high      image:frontend       GnuPG: GnuPG: Information disclosure and potential arbitrary  debian 11.3
+high      image:frontend       HTTP/2: Multiple HTTP/2 enabled web servers are vulnerable t  debian 11.3
+
+
+== Resolved #30 -> #31 outside the image scans (image:frontend: 1014 resolved, image:api: 0)
+  high dast:api 40018 | SQL Injection | GET /users/v1/{username}
+  high dast:api 40018 | SQL Injection | POST /users/v1/login
+  high dast:web 10003 | Vulnerable JS Library | GET /vendor/moment.min.js
+  high dockerfile:api AVD-DS-0002 | Image user should not be 'root' | Dockerfile
+  high dockerfile:frontend AVD-DS-0002 | Image user should not be 'root' | Dockerfile
+  high sast -user-entrypoint.missing-user-entrypoint | By not specifying a USER, a program in the container ma | Dockerfile:16
+  high sast rfile.security.missing-user.missing-user | By not specifying a USER, a program in the container ma | Dockerfile:17
+  high sast northwind.python.sqli-string-built-query | SQL text is built from a formatted or concatenated stri | models/user_model.py:73
+  high sca GHSA-35jh-r3h4-6jhm | GHSA-35jh-r3h4-6jhm in lodash 4.17.15 | /frontend/package-lock.json
+  high sca GHSA-8hfj-j24r-96c4 | GHSA-8hfj-j24r-96c4 in moment 2.24.0 | /frontend/package-lock.json
+  high sca GHSA-p6mc-m468-83gw | GHSA-p6mc-m468-83gw in lodash 4.17.15 | /frontend/package-lock.json
+  high sca GHSA-r5fr-rjxr-66jc | GHSA-r5fr-rjxr-66jc in lodash 4.17.15 | /frontend/package-lock.json
+  high sca GHSA-wc69-rhjr-hc9g | GHSA-wc69-rhjr-hc9g in moment 2.24.0 | /frontend/package-lock.json
+  medium dast:web 10038 | Content Security Policy (CSP) Header Not Set | GET /sitemap.xml
+  medium dast:web 10038 | Content Security Policy (CSP) Header Not Set | GET /robots.txt
+  medium dast:web 10038 | Content Security Policy (CSP) Header Not Set | GET /
+  medium dast:web 10020 | Missing Anti-clickjacking Header | GET /
+  medium dast:web 10020 | Missing Anti-clickjacking Header | GET /sitemap.xml
+  medium dast:web 10003 | Vulnerable JS Library | GET /vendor/jquery.min.js
+  medium sca GHSA-29mw-wpgm-hmr9 | GHSA-29mw-wpgm-hmr9 in lodash 4.17.15 | /frontend/package-lock.json
+  medium sca GHSA-gxr4-xjj5-5px2 | GHSA-gxr4-xjj5-5px2 in jquery 3.4.1 | /frontend/package-lock.json
+  medium sca GHSA-jpcq-cgw6-v4j6 | GHSA-jpcq-cgw6-v4j6 in jquery 3.4.1 | /frontend/package-lock.json
+  medium sca GHSA-xxjr-mmjv-4gpg | GHSA-xxjr-mmjv-4gpg in lodash 4.17.15 | /frontend/package-lock.json
+  low dast:api 10036 | Server Leaks Version Information via "Server" HTTP Resp | PUT /users/v1/{username}/password
+  low dast:api 10116 | ZAP is Out of Date | GET /
+  low dast:web 10036 | Server Leaks Version Information via "Server" HTTP Resp | GET /app.js
+  low dast:web 10036 | Server Leaks Version Information via "Server" HTTP Resp | GET /vendor/moment.min.js
+  low dast:web 10036 | Server Leaks Version Information via "Server" HTTP Resp | GET /vendor/lodash.min.js
+  low dast:web 10036 | Server Leaks Version Information via "Server" HTTP Resp | GET /
+  low dast:web 10036 | Server Leaks Version Information via "Server" HTTP Resp | GET /style.css
+  low dast:web 10036 | Server Leaks Version Information via "Server" HTTP Resp | GET /sitemap.xml
+  low dast:web 10036 | Server Leaks Version Information via "Server" HTTP Resp | GET /robots.txt
+  low dast:web 10036 | Server Leaks Version Information via "Server" HTTP Resp | GET /vendor/jquery.min.js
+  low dast:web 10021 | X-Content-Type-Options Header Missing | GET /vendor/moment.min.js
+  low dast:web 10021 | X-Content-Type-Options Header Missing | GET /style.css
+  low dast:web 10021 | X-Content-Type-Options Header Missing | GET /sitemap.xml
+  low dast:web 10021 | X-Content-Type-Options Header Missing | GET /
+  low dast:web 10021 | X-Content-Type-Options Header Missing | GET /robots.txt
+  low dast:web 10021 | X-Content-Type-Options Header Missing | GET /vendor/lodash.min.js
+  low dast:web 10021 | X-Content-Type-Options Header Missing | GET /vendor/jquery.min.js
+  low dast:web 10021 | X-Content-Type-Options Header Missing | GET /app.js
+  low dast:web 10116 | ZAP is Out of Date | GET /robots.txt
