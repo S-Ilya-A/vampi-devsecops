@@ -1,0 +1,56 @@
+{
+ "results": [
+  {
+   "check_id": "northwind.sqli-string-built-query",
+   "path": "models/user_model.py",
+   "start": {
+    "line": 72
+   },
+   "end": {
+    "line": 72
+   },
+   "extra": {
+    "severity": "ERROR",
+    "lines": "    user_query = f\"SELECT * FROM users WHERE username = '{username}'\"",
+    "message": "SQL built from a string\nmore",
+    "metadata": {
+     "cwe": [
+      "CWE-89: SQL Injection"
+     ]
+    }
+   }
+  },
+  {
+   "check_id": "northwind.token-in-localstorage",
+   "path": "frontend/public/app.js",
+   "start": {
+    "line": 10
+   },
+   "end": {
+    "line": 10
+   },
+   "extra": {
+    "severity": "WARNING",
+    "lines": "localStorage.setItem('token', t)",
+    "message": "token in localStorage",
+    "metadata": {}
+   }
+  },
+  {
+   "check_id": "northwind.token-in-localstorage",
+   "path": "frontend/public/app.js",
+   "start": {
+    "line": 40
+   },
+   "end": {
+    "line": 40
+   },
+   "extra": {
+    "severity": "WARNING",
+    "lines": "localStorage.setItem('token', t)",
+    "message": "token in localStorage",
+    "metadata": {}
+   }
+  }
+ ]
+}

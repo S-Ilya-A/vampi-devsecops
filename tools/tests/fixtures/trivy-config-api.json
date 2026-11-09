@@ -1,0 +1,25 @@
+{
+ "Results": [
+  {
+   "Target": "Dockerfile",
+   "Class": "config",
+   "Misconfigurations": [
+    {
+     "ID": "DS002",
+     "AVDID": "AVD-DS-0002",
+     "Title": "Image user should not be 'root'",
+     "Severity": "HIGH",
+     "Status": "FAIL",
+     "Resolution": "Add USER"
+    },
+    {
+     "ID": "DS001",
+     "AVDID": "AVD-DS-0001",
+     "Title": "':latest' tag used",
+     "Severity": "MEDIUM",
+     "Status": "PASS"
+    }
+   ]
+  }
+ ]
+}

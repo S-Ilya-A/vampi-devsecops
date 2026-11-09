@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Trend report from the telemetry store. All options: scripts/trend --help
+#   scripts/trend --since 7d
+#   scripts/trend --since 2026-11-01 --format json --ref master
+# Logs in as the read-only analyst user (password and CA from .local/telemetry/).
+here="$(cd "$(dirname "$0")/.." && { pwd -W 2>/dev/null || pwd; })"
+PY="$(command -v python3 || command -v python)"
+PYTHONPATH="$here/tools" exec "$PY" -m nwtelemetry.trend "$@"

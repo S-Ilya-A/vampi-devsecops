@@ -4,6 +4,7 @@ stages:
   - scan
   - deploy
   - dast
+  - report
 
 variables:
   API_IMAGE: $CI_REGISTRY_IMAGE/api
@@ -59,6 +60,15 @@ frontend-check:
     - cd frontend
     - npm install --prefer-offline --no-audit --no-fund
     - npm test
+
+# The telemetry tooling (tools/nwtelemetry): standard library only, so the tests
+# need nothing installed and run offline.
+telemetry-tests:
+  stage: test
+  image: python:3.12-alpine
+  needs: []
+  script:
+    - PYTHONPATH=tools python -m unittest discover -s tools/tests -v
 
 .docker-build:
   stage: build
@@ -398,3 +408,37 @@ dast-zap-api:
     - >-
       python3 ci/zap_gate.py reports/zap-api.json --fail-on high --suppressions .zap/suppressions.json
       --require-uri "^$API/users/v1" --require-uri "^$API/books/v1"
+
+# --- Telemetry: findings, scan runs and job events to OpenSearch ---------------
+# Runs after everything else, also when gates failed (those runs are the ones
+# worth recording). Every scanner's reports are pulled in as artefacts; a scan
+# whose job did not run or produced no report is recorded as "missing", never as
+# zero findings. Job events come from the GitLab API (read_api project token).
+# The trend for this branch is printed and kept as an artefact. The CI account
+# can write pipeline data and read it back, but cannot read application logs,
+# so that section of the report says so.
+telemetry-report:
+  stage: report
+  image: python:3.12-alpine
+  rules:
+    - if: $TELEMETRY_URL && $TELEMETRY_PASSWORD
+      when: always
+  needs:
+    - { job: sast-semgrep, artifacts: true, optional: true }
+    - { job: secrets-gitleaks, artifacts: true, optional: true }
+    - { job: sca-grype, artifacts: true, optional: true }
+    - { job: scan-image-api, artifacts: true, optional: true }
+    - { job: scan-image-frontend, artifacts: true, optional: true }
+    - { job: dast-zap-baseline, artifacts: true, optional: true }
+    - { job: dast-zap-api, artifacts: true, optional: true }
+  variables:
+    GIT_DEPTH: "1"
+    PYTHONPATH: tools
+  script:
+    - python -m nwtelemetry.ship --reports reports --zap-suppressions .zap/suppressions.json
+    - python -m nwtelemetry.trend --since 30d --ref "$CI_COMMIT_REF_NAME" --format json >reports/trend.json
+    - python -m nwtelemetry.trend --since 30d --ref "$CI_COMMIT_REF_NAME" | tee reports/trend.txt
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths: [reports/trend.json, reports/trend.txt]

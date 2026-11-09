@@ -1,0 +1,12 @@
+[
+ {
+  "Description": "AWS access token",
+  "RuleID": "aws-access-token",
+  "File": "deploy/s3-backup.env",
+  "Commit": "c9c8553d0000000000000000000000000000abcd",
+  "Secret": "synthetic-value-0001",
+  "Match": "AWS_ACCESS_KEY_ID=synthetic-value-0001",
+  "StartLine": 2,
+  "Fingerprint": "c9c8553d:deploy/s3-backup.env:aws-access-token:2"
+ }
+]

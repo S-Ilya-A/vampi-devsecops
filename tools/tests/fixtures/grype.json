@@ -1,0 +1,43 @@
+{
+ "matches": [
+  {
+   "vulnerability": {
+    "id": "GHSA-35jh-r3h4-6jhm",
+    "severity": "High",
+    "fix": {
+     "versions": [
+      "4.17.21"
+     ],
+     "state": "fixed"
+    },
+    "description": "lodash command injection"
+   },
+   "artifact": {
+    "name": "lodash",
+    "version": "4.17.15",
+    "type": "npm",
+    "locations": [
+     {
+      "path": "/frontend/package-lock.json"
+     }
+    ]
+   }
+  },
+  {
+   "vulnerability": {
+    "id": "GHSA-0000-0000-0000",
+    "severity": "Negligible",
+    "fix": {
+     "versions": [],
+     "state": "not-fixed"
+    }
+   },
+   "artifact": {
+    "name": "moment",
+    "version": "2.24.0",
+    "type": "npm",
+    "locations": []
+   }
+  }
+ ]
+}

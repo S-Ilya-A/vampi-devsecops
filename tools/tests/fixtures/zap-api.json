@@ -1,0 +1,77 @@
+{
+ "site": [
+  {
+   "@name": "http://staging.northwind.test:15000",
+   "alerts": [
+    {
+     "pluginid": "40018",
+     "alertRef": "40018",
+     "alert": "SQL Injection",
+     "name": "SQL Injection",
+     "riskcode": "3",
+     "confidence": "2",
+     "cweid": "89",
+     "desc": "<p>SQL injection may be possible.</p>",
+     "instances": [
+      {
+       "uri": "http://staging.northwind.test:15000/users/v1/'",
+       "method": "GET",
+       "attack": "'"
+      },
+      {
+       "uri": "http://staging.northwind.test:15000/users/v1/name1%22",
+       "method": "GET",
+       "attack": "name1\""
+      },
+      {
+       "uri": "http://staging.northwind.test:15000/users/v1/name1%20AND%201=1%20--%20/password",
+       "method": "PUT",
+       "attack": "name1 AND 1=1 -- "
+      }
+     ]
+    },
+    {
+     "pluginid": "100000",
+     "alertRef": "100000",
+     "alert": "A Client Error response code was returned by the server",
+     "riskcode": "0",
+     "confidence": "3",
+     "cweid": "388",
+     "desc": "",
+     "instances": [
+      {
+       "uri": "http://staging.northwind.test:15000/users/v1/dast1a2b3c4d/email",
+       "method": "PUT",
+       "attack": ""
+      },
+      {
+       "uri": "http://staging.northwind.test:15000/users/v1/%3Cscript%3E/email",
+       "method": "PUT",
+       "attack": ""
+      },
+      {
+       "uri": "http://staging.northwind.test:15000/'/v1/login",
+       "method": "POST",
+       "attack": ""
+      }
+     ]
+    },
+    {
+     "pluginid": "10021",
+     "alertRef": "10021",
+     "alert": "X-Content-Type-Options Header Missing",
+     "riskcode": "1",
+     "confidence": "0",
+     "cweid": "693",
+     "desc": "",
+     "instances": [
+      {
+       "uri": "http://staging.northwind.test:15000/",
+       "method": "GET"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,18 @@
+{
+ "suppressions": [
+  {
+   "id": "S-02",
+   "pluginid": "40018",
+   "uri_regex": "^http://staging\\.northwind\\.test:15000/users/v1/[^/]+/password$",
+   "reason": "test",
+   "expires": "2999-01-01"
+  },
+  {
+   "id": "S-99",
+   "pluginid": "40018",
+   "uri_regex": ".*",
+   "reason": "expired, must not apply",
+   "expires": "2000-01-01"
+  }
+ ]
+}

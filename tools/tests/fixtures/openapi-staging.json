@@ -1,0 +1,16 @@
+{
+ "openapi": "3.0.1",
+ "servers": [
+  {
+   "url": "http://staging.northwind.test:15000"
+  }
+ ],
+ "paths": {
+  "/users/v1": {},
+  "/users/v1/login": {},
+  "/users/v1/{username}": {},
+  "/users/v1/{username}/email": {},
+  "/users/v1/{username}/password": {},
+  "/books/v1/{book_title}": {}
+ }
+}

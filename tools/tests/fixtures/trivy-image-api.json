@@ -1,0 +1,49 @@
+{
+ "ArtifactName": "gitlab.northwind.test:5050/root/vampi-devsecops/api:b0bd24b9",
+ "Results": [
+  {
+   "Target": "gitlab.northwind.test:5050/root/vampi-devsecops/api:b0bd24b9 (alpine 3.24.4)",
+   "Class": "os-pkgs",
+   "Type": "alpine",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2026-0001",
+     "PkgName": "busybox",
+     "InstalledVersion": "1.37.0-r1",
+     "FixedVersion": "1.37.0-r2",
+     "Severity": "HIGH",
+     "Title": "busybox: overflow"
+    }
+   ]
+  },
+  {
+   "Target": "Python",
+   "Class": "lang-pkgs",
+   "Type": "python-pkg",
+   "Vulnerabilities": [
+    {
+     "VulnerabilityID": "CVE-2022-29217",
+     "PkgName": "PyJWT",
+     "PkgPath": "usr/local/lib/python3.11/site-packages/PyJWT-1.7.1.dist-info/METADATA",
+     "InstalledVersion": "1.7.1",
+     "FixedVersion": "",
+     "Severity": "CRITICAL",
+     "Title": "PyJWT key confusion"
+    }
+   ]
+  },
+  {
+   "Target": "/vampi/openapi_specs/openapi3.yml",
+   "Class": "secret",
+   "Secrets": [
+    {
+     "RuleID": "jwt-token",
+     "Title": "JWT token",
+     "Severity": "MEDIUM",
+     "StartLine": 193,
+     "Match": "auth_token: ****"
+    }
+   ]
+  }
+ ]
+}
