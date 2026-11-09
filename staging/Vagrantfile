@@ -1,0 +1,45 @@
+# Staging VM for VAmPI. Created and updated only through scripts/staging-up.sh,
+# which passes the deploy key and settings below as environment variables.
+#
+# Network: every forwarded port listens on the host's loopback only.
+#   host 127.0.0.1:2250  -> VM 22    SSH (deploy user, key only)
+#   host 127.0.0.1:18088 -> VM 8088  web client (nginx, proxies /api/)
+#   host 127.0.0.1:15000 -> VM 5000  API
+# Job containers reach these through the Docker host gateway; the VM reaches the
+# host (registry, Docker Hub mirror, OpenSearch) through VirtualBox NAT at 10.0.2.2.
+
+box_version  = "202510.26.0"
+ssh_port     = Integer(ENV.fetch("STAGING_SSH_PORT", "2250"))
+web_port     = Integer(ENV.fetch("STAGING_WEB_PORT", "18088"))
+api_port     = Integer(ENV.fetch("STAGING_API_PORT", "15000"))
+deploy_key   = ENV.fetch("STAGING_DEPLOY_PUBKEY", "")
+host_names   = ENV.fetch("STAGING_HOST_NAMES", "gitlab.northwind.test telemetry.northwind.test")
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/debian-12"
+  config.vm.box_version = box_version
+  config.vm.box_check_update = false
+  config.vm.hostname = "vampi-staging"
+
+  # Fixed ports: CI variables and the runner depend on them, so never auto-correct.
+  config.vm.network "forwarded_port", id: "ssh", guest: 22, host: ssh_port,
+                    host_ip: "127.0.0.1", auto_correct: false
+  config.vm.network "forwarded_port", guest: 8088, host: web_port,
+                    host_ip: "127.0.0.1", auto_correct: false
+  config.vm.network "forwarded_port", guest: 5000, host: api_port,
+                    host_ip: "127.0.0.1", auto_correct: false
+
+  # Nothing from the host is shared into the VM; files go in by explicit copy.
+  config.vm.synced_folder ".", "/vagrant", disabled: true
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "vampi-staging"
+    vb.memory = 1536
+    vb.cpus = 2
+    vb.linked_clone = true
+  end
+
+  config.vm.provision "file", source: "vm", destination: "/tmp/staging-vm"
+  config.vm.provision "shell", path: "vm/provision.sh",
+                      env: { "DEPLOY_PUBKEY" => deploy_key, "HOST_NAMES" => host_names }
+end

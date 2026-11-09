@@ -1,0 +1,68 @@
+# Staging stack, deployed to the VM by the pipeline (deploy-staging job).
+# Images are the ones the same pipeline built, by commit tag; nothing is built here.
+#   IMAGE_TAG          set by the deploy job ($CI_COMMIT_SHORT_SHA)
+#   POSTGRES_PASSWORD  from /opt/vampi/.env, generated on the VM by provisioning
+name: vampi
+
+# Logging: every service ships to Fluent Bit on the VM (fluentd driver, tag
+# vampi.<service>). fluentd-async lets the app start and keep running while Fluent
+# Bit is down; Docker keeps a local copy, so `docker logs` still works.
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vampi
+      POSTGRES_USER: vampi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in /opt/vampi/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vampi -d vampi"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "127.0.0.1:24224"
+        fluentd-async: "true"
+        tag: "vampi.db"
+
+  api:
+    image: ${REGISTRY:-gitlab.northwind.test:5050}/root/vampi-devsecops/api:${IMAGE_TAG:?}
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      vulnerable: "1"
+      # Long enough for an authenticated DAST run.
+      tokentimetolive: "3600"
+      DATABASE_URL: postgresql://vampi:${POSTGRES_PASSWORD}@db:5432/vampi
+    depends_on:
+      db:
+        condition: service_healthy
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "127.0.0.1:24224"
+        fluentd-async: "true"
+        tag: "vampi.api"
+
+  frontend:
+    image: ${REGISTRY:-gitlab.northwind.test:5050}/root/vampi-devsecops/frontend:${IMAGE_TAG:?}
+    restart: unless-stopped
+    ports:
+      - "8088:80"
+    depends_on:
+      - api
+    logging:
+      driver: fluentd
+      options:
+        fluentd-address: "127.0.0.1:24224"
+        fluentd-async: "true"
+        tag: "vampi.frontend"
+
+volumes:
+  pgdata:

@@ -104,3 +104,6 @@ venv.bak/
 .trivycache/
 .grypedb/
 reports/
+
+# Vagrant machine state for the staging VM
+staging/.vagrant/

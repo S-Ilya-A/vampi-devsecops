@@ -1,0 +1,24 @@
+# Fluent Bit on the staging VM. The application containers log to it with Docker's
+# fluentd driver (forward protocol on 127.0.0.1:24224); it ships to OpenSearch on
+# the host. A filesystem buffer keeps logs while OpenSearch is down.
+services:
+  fluent-bit:
+    image: fluent/fluent-bit:3.1.9
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:24224:24224"
+    volumes:
+      - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./parsers.conf:/fluent-bit/etc/parsers-northwind.conf:ro
+      - buffer:/var/lib/fluent-bit
+    extra_hosts:
+      - "telemetry.northwind.test:10.0.2.2"
+    environment:
+      OPENSEARCH_HOST: telemetry.northwind.test
+      OPENSEARCH_PORT: "9200"
+    # Fluent Bit's own logs go to the local driver, not to itself.
+    logging:
+      driver: local
+
+volumes:
+  buffer:

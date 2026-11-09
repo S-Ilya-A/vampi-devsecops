@@ -45,6 +45,14 @@ MIRROR_URL="http://${GITLAB_HOST}:${MIRROR_PORT}"
 
 PROJECT_PATH="${PROJECT_PATH:-vampi-devsecops}"
 
+# Staging VM (Task 3). Its forwarded ports listen on the host's loopback; job
+# containers reach them under STAGING_HOST, which resolves to the Docker host gateway.
+STAGING_HOST="${STAGING_HOST:-staging.northwind.test}"
+STAGING_SSH_PORT="${STAGING_SSH_PORT:-2250}"
+STAGING_WEB_PORT="${STAGING_WEB_PORT:-18088}"
+STAGING_API_PORT="${STAGING_API_PORT:-15000}"
+STAGING_VM_NAME="${STAGING_VM_NAME:-vampi-staging}"
+
 # Local traffic must not go through a corporate/desktop HTTP proxy.
 export NO_PROXY="${NO_PROXY:-},${GITLAB_HOST},localhost,127.0.0.1"
 export no_proxy="$NO_PROXY"
