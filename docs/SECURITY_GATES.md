@@ -56,9 +56,11 @@ Disabling a rule, or adding a path to an ignore file to make a finding go away, 
 | ID | Tool | Finding | Where | Mechanism | Why it is a false positive | Review by |
 |---|---|---|---|---|---|---|
 | S-01 | Gitleaks, Semgrep | JWT (`jwt`, `generic.secrets.security.detected-jwt-token`) | `openapi_specs/openapi3.yml`, `auth_token` example of `/users/v1/login` | Gitleaks: exact-value allowlist in `.gitleaks.toml`. Semgrep: `nosemgrep` with the rule id on that line | A documentation example. Its `exp` is 2022-12-04, so it cannot be replayed, and its subject `John.Doe` is not a user of the application. An allowlist by value rather than by fingerprint survives the line moving, and still catches any other token in the same file. | 2027-05-01 |
+| S-02 | ZAP (`dast-zap-api`) | SQL Injection, rule 40018 | `PUT /users/v1/{username}/password` only (URL regex) | `.zap/suppressions.json`, read by `ci/zap_gate.py`; ignored after its `expires` date | The handler looks the user up with the ORM (`User.query.filter_by(username=...)`); no SQL is built from the path. ZAP sent `name1 AND 1=1 --` and got 400 "User Not Found", then `name1` and got 204, and read the difference as a boolean condition. The real flaw at this URL is PT-03 (any logged-in user can change anyone's password), which no ZAP rule detects; Task 5 / NOTE.md track it. The same rule still blocks on `GET /users/v1/{username}` (PT-01). | 2027-02-09 |
 
 How to add one per tool:
 - **Semgrep**: `# nosemgrep: <full rule id>` on the line, followed by `-- S-NN`.
 - **Gitleaks**: for a finding that lives only in history (for example a credential that has since been rotated), add its fingerprint to `.gitleaksignore`. For a value that stays in the tree, add an exact-value allowlist to `.gitleaks.toml`.
 - **Trivy**: an entry in `.trivyignore.yaml` with `id`, `paths` or `purls`, a `statement` and an `expired_at`. After that date the finding blocks again.
+- **ZAP**: an entry in `.zap/suppressions.json` with the rule's `pluginid`, a `uri_regex` for the affected URLs, a `reason` and an `expires` date. `ci/zap_gate.py` refuses an entry with any of these missing and ignores it after that date.
 - **Grype**: an `ignore` entry in `.grype.yaml` with the vulnerability id, the package name and version, and a comment carrying the S-number.
