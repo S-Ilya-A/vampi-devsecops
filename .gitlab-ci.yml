@@ -200,7 +200,7 @@ sca-grype:
     key: grype-db
     paths: [.grypedb/]
   script:
-    - /grype db update || echo "WARN: could not refresh the vulnerability DB, using the cached copy"
+    - '/grype db update || echo "WARN - could not refresh the vulnerability DB, using the cached copy"'
     - /grype db status
     - /grype sbom:reports/sbom.syft.json -o json --file reports/grype.json
     - /grype sbom:reports/sbom.syft.json --only-fixed --fail-on high -o table
@@ -231,7 +231,7 @@ sca-grype:
     paths: [.trivycache/]
   script:
     - mkdir -p reports
-    - trivy image --download-db-only || echo "WARN: could not refresh the vulnerability DB, using the cached copy"
+    - 'trivy image --download-db-only || echo "WARN - could not refresh the vulnerability DB, using the cached copy"'
     # Full reports: every severity, all packages (the image SBOM comes from this).
     - >-
       trivy image --skip-db-update --scanners vuln,secret --image-config-scanners secret

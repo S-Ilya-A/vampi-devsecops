@@ -271,9 +271,16 @@ while :; do
   sleep 10
 done
 
-api GET "/projects/$PROJECT_ID/pipelines/$pipeline_id/jobs?per_page=100" | json_get '"\n".join(
-  "    %-16s %-8s %-8s %6.1fs" % (j["name"], j["stage"], j["status"], j["duration"] or 0)
-  for j in sorted(d, key=lambda j: j["id"]))'
+jobs=$(api GET "/projects/$PROJECT_ID/pipelines/$pipeline_id/jobs?per_page=100")
+if [ "$jobs" = "[]" ]; then
+  # No jobs at all: the pipeline was rejected before it started, almost always invalid YAML.
+  warn "pipeline has no jobs; CI lint of $SHA says:"
+  api GET "/projects/$PROJECT_ID/ci/lint?content_ref=$SHA" | json_get '"\n".join("    " + e for e in d.get("errors", []))'
+else
+  printf '%s' "$jobs" | json_get '"\n".join(
+    "    %-22s %-6s %-8s %6.1fs" % (j["name"], j["stage"], j["status"], j["duration"] or 0)
+    for j in sorted(d, key=lambda j: j["id"]))'
+fi
 
 [ "$status" = success ] || die "pipeline #$pipeline_id finished with status: $status"
 ok "pipeline #$pipeline_id passed"
