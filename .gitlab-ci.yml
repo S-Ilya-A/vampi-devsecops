@@ -363,21 +363,33 @@ dast-zap-baseline:
     - >-
       /zap/zap-baseline.py -t "http://$STAGING_HOST:$STAGING_WEB_PORT/" -m 3 -j -I
       -J zap-baseline.json -r zap-baseline.html
-    - python3 ci/zap_gate.py reports/zap-baseline.json --fail-on medium --suppressions .zap/suppressions.json
+    - >-
+      python3 ci/zap_gate.py reports/zap-baseline.json --fail-on medium --suppressions .zap/suppressions.json
+      --require-uri "^http://$STAGING_HOST:$STAGING_WEB_PORT/"
 
 dast-zap-api:
   extends: .zap
   variables:
     # Bounded active scan: at most 2 minutes per rule and 12 minutes overall.
-    ZAP_LIMITS: -config scanner.maxRuleDurationInMins=2 -config scanner.maxScanDurationInMins=12
+    # scanner.injectable=19 adds URL path segments (16) to query (1) and body (2):
+    # by default ZAP never attacks /users/v1/{username}, where the SQLi (PT-01) is.
+    ZAP_OPTIONS: >-
+      -config scanner.maxRuleDurationInMins=2 -config scanner.maxScanDurationInMins=12
+      -config scanner.injectable=19
   script:
     - API="http://$STAGING_HOST:$STAGING_API_PORT"
-    - python3 ci/dast_session.py "$API" .dast-token
+    - python3 ci/dast_session.py "$API" .dast-token reports/openapi-staging.json
+    # The definition is imported from a file whose server URL is staging. With
+    # -O and a URL, ZAP joined the operations onto the spec's own URL
+    # (/openapi.json/users/v1 -> 404) and scanned nothing; with -O host:port the
+    # script mistakes the host for a URL scheme. See ci/dast_session.py.
     # ZAP adds this header to every request it sends (ZAP_AUTH_HEADER_* are read
     # by ZAP itself), so the active scan reaches the endpoints behind the login.
     - export ZAP_AUTH_HEADER=Authorization ZAP_AUTH_HEADER_VALUE="Bearer $(cat .dast-token)" ZAP_AUTH_HEADER_SITE="$STAGING_HOST"
     - >-
-      /zap/zap-api-scan.py -t "$API/openapi.json" -f openapi -O "$API" -I
-      -z "$ZAP_LIMITS"
+      /zap/zap-api-scan.py -t /zap/wrk/openapi-staging.json -f openapi -I
+      -z "$ZAP_OPTIONS"
       -J zap-api.json -r zap-api.html
-    - python3 ci/zap_gate.py reports/zap-api.json --fail-on high --suppressions .zap/suppressions.json
+    - >-
+      python3 ci/zap_gate.py reports/zap-api.json --fail-on high --suppressions .zap/suppressions.json
+      --require-uri "^$API/users/v1" --require-uri "^$API/books/v1"
