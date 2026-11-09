@@ -192,7 +192,7 @@ sca-grype:
   stage: test
   needs: [sbom-syft]
   image:
-    name: anchore/grype:v0.86.1-debug
+    name: anchore/grype:v0.99.1-debug
     entrypoint: [""]
   variables:
     GRYPE_DB_CACHE_DIR: $CI_PROJECT_DIR/.grypedb
@@ -231,11 +231,14 @@ sca-grype:
     TRIVY_IGNOREFILE: .trivyignore.yaml
     # Misconfiguration checks embedded in the pinned Trivy release: deterministic and offline.
     TRIVY_SKIP_CHECK_UPDATE: "true"
+    # Neither image contains Java; without this Trivy downloads its Java DB (hundreds of MB, minutes) on every run.
+    TRIVY_SKIP_JAVA_DB_UPDATE: "true"
   cache:
     key: trivy-db
     # A failing gate must still save its data, or the next offline run has none.
     when: always
-    paths: [.trivycache/]
+    # Only the vulnerability DB: the layer cache (fanal/) is large and per-image.
+    paths: [.trivycache/db/]
   script:
     - mkdir -p reports
     - 'trivy image --download-db-only || echo "WARN - could not refresh the vulnerability DB, using the cached copy"'

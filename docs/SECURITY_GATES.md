@@ -9,7 +9,7 @@ The source of truth for what each pipeline gate scans, when it fails and why, an
 | SAST | `sast-semgrep` | Semgrep 1.95.0 | Python, JavaScript, Dockerfiles, YAML in the working tree; `tests/` and vendored minified JS excluded (`.semgrepignore`) | any finding of severity **ERROR** | `semgrep.json` |
 | Secrets | `secrets-gitleaks` | Gitleaks 8.21.2 | every commit reachable from any branch or tag (`--log-opts=--all` after fetching all refs, `GIT_DEPTH: 0`) | **any** finding | `gitleaks.json` |
 | SBOM | `sbom-syft` | Syft 1.18.1 | `requirements.txt` (pip) and `frontend/package-lock.json` (npm) | does not gate | `sbom.cdx.json` (CycloneDX), `sbom.syft.json` |
-| SCA | `sca-grype` | Grype 0.86.1 | the SBOM above | **High or Critical** vulnerability **with a released fix** | `grype.json` (all severities, fixed and unfixed) |
+| SCA | `sca-grype` | Grype 0.99.1 | the SBOM above | **High or Critical** vulnerability **with a released fix** | `grype.json` (all severities, fixed and unfixed) |
 | Image | `scan-image-api`, `scan-image-frontend` | Trivy 0.57.1 | the image just built (base OS packages, installed Python/npm packages, secrets in layers and image config) and the Dockerfile it was built from | **High or Critical** vulnerability **with a fix**, **any** secret, **High or Critical** Dockerfile misconfiguration | `trivy-image-<name>.json`, `trivy-config-<name>.json`, `sbom-image-<name>.cdx.json` |
 
 Every report holds all severities, and every job uploads its reports even when it fails (`artifacts: when: always`). The threshold decides only whether the job fails; nothing is left out of the record.
@@ -27,7 +27,21 @@ With only the registry rulesets (`p/default`, `p/security-audit`, `p/owasp-top-t
 
 ## Offline behaviour
 
-The scanners' data is kept in the GitLab CI cache: Semgrep registry rules in `.semgrep-registry/`, the Grype database in `.grypedb/`, and the Trivy database in `.trivycache/`. Each job first tries to refresh its data and falls back to the cached copy if that fails. Grype refuses a database older than 30 days (`GRYPE_DB_MAX_ALLOWED_BUILT_AGE`), so a long-offline pipeline fails closed rather than passing on stale data. Trivy's misconfiguration checks are the ones embedded in the pinned release (`TRIVY_SKIP_CHECK_UPDATE`), so Dockerfile results only change when the Trivy version changes. The Trivy database comes from `ghcr.io` because the default mirror (`mirror.gcr.io`) was serving a missing blob when this was set up.
+The scanners' data is kept in the GitLab CI cache: Semgrep registry rules in `.semgrep-registry/`, the Grype database in `.grypedb/`, and the Trivy database in `.trivycache/db/`. The scanner jobs save their cache even when the gate fails (`cache: when: always`). GitLab's default is to save only on success, and a gate that always failed would then never have stored a database. Each job first tries to refresh its data and falls back to the cached copy if that fails. Grype refuses a database older than 30 days (`GRYPE_DB_MAX_ALLOWED_BUILT_AGE`), so a long-offline pipeline fails closed rather than passing on stale data. Trivy's misconfiguration checks are the ones embedded in the pinned release (`TRIVY_SKIP_CHECK_UPDATE`), so Dockerfile results only change when the Trivy version changes. The Trivy database comes from `ghcr.io` because the default mirror (`mirror.gcr.io`) was serving a missing blob when this was set up. The Java DB is not fetched at all (`TRIVY_SKIP_JAVA_DB_UPDATE`), since neither image contains Java.
+
+To test the fallback, run a pipeline whose update sources are unreachable. Pipeline variables override the ones in `.gitlab-ci.yml`:
+
+```bash
+curl -X POST -H "PRIVATE-TOKEN: $(cat .local/root-token)" -H 'Content-Type: application/json' \
+  http://gitlab.northwind.test:8929/api/v4/projects/1/pipeline -d '{"ref":"master","variables":[
+    {"key":"TRIVY_DB_REPOSITORY","value":"127.0.0.1:1/offline/trivy-db:2"},
+    {"key":"GRYPE_DB_UPDATE_URL","value":"http://127.0.0.1:1/listing.json"},
+    {"key":"SEMGREP_RULES_URL","value":"http://127.0.0.1:1/c/p"}]}'
+```
+
+Every scanner job should then log that it is using its cached copy and reach the same verdict as an online run.
+
+**Grype version.** Grype was first pinned at 0.86.1. That release reads database schema v5, and the newest v5 database available was built on 2026-03-09, eight months old. Grype 0.86.1 also did not apply `GRYPE_DB_MAX_ALLOWED_BUILT_AGE`, so it accepted that database without complaint. Grype 0.99.1 uses schema v6, which is rebuilt daily, and it does enforce the age limit: with a 1-hour limit it refuses a database built 1 day ago. A pinned scanner can go stale silently, so the database build date is printed in every run (`grype db status`).
 
 ## Suppressions
 
