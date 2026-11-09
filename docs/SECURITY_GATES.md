@@ -41,7 +41,7 @@ curl -X POST -H "PRIVATE-TOKEN: $(cat .local/root-token)" -H 'Content-Type: appl
 
 Every scanner job should then log that it is using its cached copy and reach the same verdict as an online run.
 
-**Grype version.** Grype was first pinned at 0.86.1. That release reads database schema v5, and the newest v5 database available was built on 2026-03-09, eight months old. Grype 0.86.1 also did not apply `GRYPE_DB_MAX_ALLOWED_BUILT_AGE`, so it accepted that database without complaint. Grype 0.99.1 uses schema v6, which is rebuilt daily, and it does enforce the age limit: with a 1-hour limit it refuses a database built 1 day ago. A pinned scanner can go stale silently, so the database build date is printed in every run (`grype db status`).
+**Grype version.** Grype was first pinned at 0.86.1. That release reads database schema v5, and the newest v5 database available was built on 2026-03-09, eight months old. Grype 0.86.1 also did not apply `GRYPE_DB_MAX_ALLOWED_BUILT_AGE`, so it accepted that database without complaint. Grype 0.99.1 uses schema v6, which is rebuilt daily, and it does enforce the age limit: with a 1-hour limit it refuses a database built 1 day ago. A pinned scanner can go stale silently, so the database build date is printed in every run (`grype db status`, also saved as `reports/grype-db-status.txt`), and the job stops with "no usable vulnerability DB" when there is none.
 
 ## Suppressions
 

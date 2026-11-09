@@ -194,19 +194,26 @@ sca-grype:
   image:
     name: anchore/grype:v0.99.1-debug
     entrypoint: [""]
+    # The image runs as a non-root user, which cannot write the checked-out
+    # project directory where the DB cache lives.
+    docker:
+      user: root
   variables:
     GRYPE_DB_CACHE_DIR: $CI_PROJECT_DIR/.grypedb
     GRYPE_DB_AUTO_UPDATE: "false"
     # Offline runs may use a database up to 30 days old, then fail closed.
     GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 720h
   cache:
-    key: grype-db
+    key: grype-db-v6
     # A failing gate must still save its data, or the next offline run has none.
     when: always
     paths: [.grypedb/]
   script:
     - '/grype db update || echo "WARN - could not refresh the vulnerability DB, using the cached copy"'
-    - /grype db status
+    # Fail with a clear message if there is no usable DB (first run offline,
+    # or older than the allowed age) instead of a scan error further down.
+    - '{ /grype db status 2>&1 || true; } | tee reports/grype-db-status.txt'
+    - grep -qE '^Status:[[:space:]]+valid$' reports/grype-db-status.txt || { echo "no usable vulnerability DB"; exit 1; }
     - /grype sbom:reports/sbom.syft.json -o json --file reports/grype.json
     - /grype sbom:reports/sbom.syft.json --only-fixed --fail-on high -o table
 
