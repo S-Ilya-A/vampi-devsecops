@@ -143,7 +143,7 @@ class Report(unittest.TestCase):
         rep = trend.build_report(FakeStore(), NOW, now=NOW)
         text = trend.render_table(rep)
         for part in ("Findings per tool per pipeline run", "Severity distribution", "#41 -> #42: 1 new, 2 recurring, 2 resolved",
-                     "not compared (no report in one of the runs): secrets", "Worth a look:", "/users/v1/'"):
+                     "not compared (no complete report in one of the runs): secrets", "Worth a look:", "/users/v1/'"):
             self.assertIn(part, text)
         row = [l for l in text.splitlines() if l.startswith("42 ")][0]
         self.assertIn("-", row.split())                           # gitleaks did not report

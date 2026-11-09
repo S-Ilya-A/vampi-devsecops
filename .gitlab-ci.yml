@@ -153,8 +153,14 @@ sast-semgrep:
         fi
         test -s ".semgrep-registry/$p.yml" || { echo "ruleset p/$p is neither cached nor reachable"; exit 1; }
       done
+    # Semgrep skips a whole file once 3 rules time out on it (5 s each by
+    # default). On a busy runner that happened to frontend/public/app.js, and
+    # every XSS finding vanished from one run while the gate passed. Never skip
+    # a file (--timeout-threshold 0); bound each rule at 60 s instead. The gate
+    # fails if a timeout still occurs.
     - >-
       semgrep scan --metrics=off --disable-version-check
+      --timeout 60 --timeout-threshold 0
       --config .semgrep-registry --config .semgrep
       --json --output reports/semgrep.json .
     - python3 ci/semgrep_gate.py reports/semgrep.json --fail-on ERROR

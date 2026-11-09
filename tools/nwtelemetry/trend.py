@@ -307,7 +307,7 @@ def table(rows, headers):
 
 def render_table(rep):
     out = ["Trend report  since %s%s  (generated %s)" % (rep["since"], "  ref " + rep["ref"] if rep["ref"] else "", rep["generated"]), ""]
-    out.append("== Findings per tool per pipeline run  (- = the scan did not report)")
+    out.append("== Findings per tool per pipeline run  (- = no complete report from that tool)")
     if rep["runs"]:
         out.append(table([[r["pipeline_id"], r["time"][:16].replace("T", " "), r["commit"], r["ref"]]
                           + ["-" if r["tools"].get(t) is None else r["tools"][t] for t in TOOLS]
@@ -331,7 +331,7 @@ def render_table(rep):
         out.append("#%s -> #%s: %d new, %d recurring, %d resolved"
                    % (ch["old_pipeline"], ch["new_pipeline"], ch["counts"]["new"], ch["counts"]["recurring"], ch["counts"]["resolved"]))
         if ch["not_compared"]:
-            out.append("not compared (no report in one of the runs): " + ", ".join(ch["not_compared"]))
+            out.append("not compared (no complete report in one of the runs): " + ", ".join(ch["not_compared"]))
         out.append(table([[t, v["new"], v["recurring"], v["resolved"]] for t, v in sorted(ch["per_tool"].items())],
                          ["tool", "new", "recurring", "resolved"]))
         for label in ("new", "resolved"):

@@ -131,6 +131,18 @@ class Scans(unittest.TestCase):
         finally:
             shutil.rmtree(tmp)
 
+    def test_semgrep_timeout_marks_the_scan_incomplete(self):
+        tmp = tempfile.mkdtemp()
+        try:
+            data = load("semgrep.json")
+            data["errors"] = [{"type": "Timeout", "path": "frontend/public/app.js"}]
+            with open(os.path.join(tmp, "semgrep.json"), "w") as f:
+                json.dump(data, f)
+            _, scans = normalize.normalize_dir(tmp)
+            self.assertEqual([s["status"] for s in scans if s["scan"] == "sast"], ["incomplete"])
+        finally:
+            shutil.rmtree(tmp)
+
     def test_counts_by_severity(self):
         _, scans = normalize.normalize_dir(FIX)
         sast = [s for s in scans if s["scan"] == "sast"][0]

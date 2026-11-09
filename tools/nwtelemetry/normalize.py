@@ -256,6 +256,12 @@ def normalize_dir(report_dir, zap_suppressions=()):
                     i["job"] = job
                 findings.extend(items)
                 entry["status"] = "reported"
+                # A Semgrep rule that timed out skipped (part of) a file: what it
+                # did not report is unknown, not resolved.
+                if tool == "semgrep" and any(
+                        (e.get("type")[0] if isinstance(e.get("type"), list) else e.get("type")) == "Timeout"
+                        for e in data.get("errors", [])):
+                    entry["status"] = "incomplete"
                 entry["findings"] = len(items)
                 for i in items:
                     entry["by_severity"][i["severity"]] = entry["by_severity"].get(i["severity"], 0) + 1
