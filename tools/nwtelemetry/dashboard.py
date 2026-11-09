@@ -48,14 +48,19 @@ def _terms(id_, schema, field, size=10, order_by="1", order="desc", label=None):
     return {"id": id_, "enabled": True, "type": "terms", "schema": schema, "params": p}
 
 
-def vis(id_, title, vtype, index, aggs, params=None, query="", description=""):
+# Fixed severity colours, so "high" is the same colour in every panel.
+SEVERITY_COLORS = {"critical": "#BD271E", "high": "#E7664C", "medium": "#D6BF57", "low": "#6092C0", "info": "#AAAAAA"}
+
+
+def vis(id_, title, vtype, index, aggs, params=None, query="", description="", colors=None):
     state = {"title": title, "type": vtype, "aggs": aggs,
              "params": dict({"type": vtype, "addTooltip": True, "addLegend": True, "legendPosition": "right"},
                             **(params or {}))}
     return {
         "type": "visualization", "id": id_,
         "attributes": {
-            "title": title, "description": description, "version": 1, "uiStateJSON": "{}",
+            "title": title, "description": description, "version": 1,
+            "uiStateJSON": json.dumps({"vis": {"colors": colors}} if colors else {}),
             "visState": json.dumps(state),
             "kibanaSavedObjectMeta": {"searchSourceJSON": _search_source(query)},
         },
@@ -74,12 +79,15 @@ def objects():
             [_count(), run_axis("2"), _terms("3", "group", "tool", size=10)], stacked,
             description="One document per finding per run; a run whose scan did not report has no bar for that tool."),
         vis("nw-severity-per-run", "Severity per pipeline run", "histogram", "nw-findings",
-            [_count(), run_axis("2"), _terms("3", "group", "severity", size=5)], stacked),
+            [_count(), run_axis("2"), _terms("3", "group", "severity", size=5)], stacked, colors=SEVERITY_COLORS),
         vis("nw-severity-pie", "Severity distribution (time range)", "pie", "nw-findings",
             [_count(), _terms("2", "segment", "severity", size=5)], {"isDonut": True},
-            description="Counts a finding once per run it appeared in."),
+            description="Counts a finding once per run it appeared in.", colors=SEVERITY_COLORS),
         vis("nw-high-findings", "High and critical findings: runs they appeared in", "table", "nw-findings",
-            [_count(), _terms("2", "bucket", "tool", size=5), _terms("3", "bucket", "title.raw", size=25, label="finding"),
+            # Distinct runs, not documents: one CVE in several packages is several documents.
+            [{"id": "1", "enabled": True, "type": "cardinality", "schema": "metric",
+              "params": {"field": "pipeline_id", "customLabel": "runs"}},
+             _terms("2", "bucket", "tool", size=5), _terms("3", "bucket", "title.raw", size=25, label="finding"),
              _terms("4", "bucket", "location", size=1, label="location")],
             {"perPage": 15}, query="severity : (critical or high)"),
         vis("nw-scan-status", "Scans that did not report", "table", "nw-scans",
