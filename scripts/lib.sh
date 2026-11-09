@@ -33,6 +33,10 @@ NETWORK="${NETWORK:-devsecops}"
 GITLAB_CONTAINER="${GITLAB_CONTAINER:-gitlab}"
 RUNNER_CONTAINER="${RUNNER_CONTAINER:-gitlab-runner}"
 RUNNER_CONCURRENCY="${RUNNER_CONCURRENCY:-2}"
+# One named volume for the CI cache, shared by all concurrent job slots. With an
+# anonymous "/cache" volume each slot gets its own, so a cache saved by a job in
+# slot 0 is invisible to the next job if it lands in slot 1.
+RUNNER_CACHE_VOLUME="${RUNNER_CACHE_VOLUME:-gitlab-runner-cache}"
 
 MIRROR_IMAGE="${MIRROR_IMAGE:-registry:2.8.3}"
 MIRROR_CONTAINER="${MIRROR_CONTAINER:-docker-mirror}"

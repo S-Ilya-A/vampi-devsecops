@@ -213,12 +213,17 @@ else
     --docker-image alpine:3.20 \
     --docker-privileged \
     --docker-volumes /certs/client \
-    --docker-volumes /cache \
+    --docker-volumes "$RUNNER_CACHE_VOLUME:/cache" \
     --docker-extra-hosts "$GITLAB_HOST:host-gateway" \
     --docker-pull-policy if-not-present >/dev/null
   docker exec "$RUNNER_CONTAINER" sed -i "s/^concurrent = .*/concurrent = ${RUNNER_CONCURRENCY}/" /etc/gitlab-runner/config.toml
   wait_until 60 "runner verification" runner_registered
   ok "runner registered (concurrency $RUNNER_CONCURRENCY)"
+fi
+# Registrations made before the shared cache volume existed: switch them over.
+if docker exec "$RUNNER_CONTAINER" grep -q '"/cache"' /etc/gitlab-runner/config.toml; then
+  docker exec "$RUNNER_CONTAINER" sed -i "s#\"/cache\"#\"$RUNNER_CACHE_VOLUME:/cache\"#" /etc/gitlab-runner/config.toml
+  ok "runner CI cache moved to the shared volume $RUNNER_CACHE_VOLUME"
 fi
 
 # --------------------------------------------------------------------------- project

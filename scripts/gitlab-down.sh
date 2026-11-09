@@ -18,7 +18,7 @@ for c in "$RUNNER_CONTAINER" "$GITLAB_CONTAINER"; do
 done
 
 if [ "$PURGE" = 1 ]; then
-  docker volume rm -f gitlab-config gitlab-logs gitlab-data gitlab-runner-config >/dev/null
+  docker volume rm -f gitlab-config gitlab-logs gitlab-data gitlab-runner-config "$RUNNER_CACHE_VOLUME" >/dev/null
   rm -f "$STATE_DIR/root-password" "$STATE_DIR/root-token"
   git -C "$REPO_ROOT" remote remove gitlab 2>/dev/null || true
   ok "volumes and secrets removed"
