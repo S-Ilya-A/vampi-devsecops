@@ -238,17 +238,21 @@ sca-grype:
     TRIVY_IGNOREFILE: .trivyignore.yaml
     # Misconfiguration checks embedded in the pinned Trivy release: deterministic and offline.
     TRIVY_SKIP_CHECK_UPDATE: "true"
-    # Neither image contains Java; without this Trivy downloads its Java DB (hundreds of MB, minutes) on every run.
+    # The nginx base image ships gettext's libintl jars, so the Java DB is needed.
+    # It is refreshed in its own step below (with the same cached fallback) and
+    # the scans themselves never try to download it.
+    TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1
     TRIVY_SKIP_JAVA_DB_UPDATE: "true"
   cache:
     key: trivy-db
     # A failing gate must still save its data, or the next offline run has none.
     when: always
-    # Only the vulnerability DB: the layer cache (fanal/) is large and per-image.
-    paths: [.trivycache/db/]
+    # Only the databases: the layer cache (fanal/) is large and per-image.
+    paths: [.trivycache/db/, .trivycache/java-db/]
   script:
     - mkdir -p reports
     - 'trivy image --download-db-only || echo "WARN - could not refresh the vulnerability DB, using the cached copy"'
+    - 'trivy image --download-java-db-only --skip-java-db-update=false || echo "WARN - could not refresh the Java DB, using the cached copy"'
     # Full reports: every severity, all packages (the image SBOM comes from this).
     - >-
       trivy image --skip-db-update --scanners vuln,secret --image-config-scanners secret
