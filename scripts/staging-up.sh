@@ -21,7 +21,7 @@ VAGRANT=$(find_tool vagrant "/c/Program Files/Vagrant/bin/vagrant.exe")
 need ssh ssh-keygen ssh-keyscan curl
 vagrant() { (cd "$STAGING_DIR" && "$VAGRANT" "$@"); }
 
-export STAGING_SSH_PORT STAGING_WEB_PORT STAGING_API_PORT
+export STAGING_SSH_PORT STAGING_WEB_PORT STAGING_API_PORT STAGING_VM_CPUS STAGING_VM_MEMORY
 export STAGING_HOST_NAMES="$GITLAB_HOST telemetry.northwind.test"
 
 if [ "${1:-}" = "--destroy" ]; then
@@ -44,8 +44,18 @@ export STAGING_DEPLOY_PUBKEY="$(cat "$KEY.pub")"
 state=$(vagrant status --machine-readable 2>/dev/null | awk -F, '$3=="state"{print $4}' | tr -d '\r')
 case "$state" in
   running)
-    log "VM running; re-applying provisioning"
-    vagrant provision ;;
+    # CPU and memory only change at boot; `vagrant provision` would leave them.
+    VBOXMANAGE=$(find_tool VBoxManage "/c/Program Files/Oracle/VirtualBox/VBoxManage.exe")
+    have=$("$VBOXMANAGE" showvminfo "$STAGING_VM_NAME" --machinereadable | tr -d '\r' \
+           | awk -F= '{v[$1]=$2} END{printf "cpus=%s memory=%s ", v["cpus"], v["memory"]}')
+    want="cpus=$STAGING_VM_CPUS memory=$STAGING_VM_MEMORY "
+    if [ "$have" != "$want" ]; then
+      log "VM has ${have}but the configuration says ${want}; rebooting it to apply"
+      vagrant reload --provision
+    else
+      log "VM running; re-applying provisioning"
+      vagrant provision
+    fi ;;
   not_created|"")
     log "Creating the staging VM (first run downloads packages: several minutes)"
     vagrant up --provider virtualbox ;;

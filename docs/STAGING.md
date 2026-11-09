@@ -11,7 +11,7 @@ scripts/staging-up.sh --destroy
 `staging-up.sh` does everything needed from a clean machine with VirtualBox and Vagrant installed:
 
 1. Generates an ed25519 deploy key in `.local/` (git-ignored) on first run.
-2. Creates the VM from `staging/Vagrantfile`, or starts it, then re-applies provisioning. The box is `bento/debian-12`, pinned to version 202510.26.0. The VM has 1.5 GB of RAM and 2 vCPUs.
+2. Creates the VM from `staging/Vagrantfile`, or starts it, then re-applies provisioning. The box is `bento/debian-12`, pinned to version 202510.26.0. The VM has 1.5 GB of RAM and 1 vCPU (`STAGING_VM_MEMORY`, `STAGING_VM_CPUS`; when the running VM differs, the script reboots it to apply the change). Why only one CPU: with Docker Desktop installed, Hyper-V owns the hardware virtualisation and VirtualBox runs on top of it. In that mode a 2-vCPU guest stalled for good under load: the kernel logged `rcu_preempt self-detected stall`, sshd stopped answering, and the deploy job hung until the runner killed it an hour later. The deploy job now has a 15-minute timeout and SSH keep-alives, so a hung VM fails the job quickly.
 3. Pins the VM's SSH host key.
 4. Checks that the `deploy` user can use Docker.
 5. Stores the key, the pinned host key and the ports as GitLab CI variables.

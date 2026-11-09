@@ -52,6 +52,8 @@ STAGING_SSH_PORT="${STAGING_SSH_PORT:-2250}"
 STAGING_WEB_PORT="${STAGING_WEB_PORT:-18088}"
 STAGING_API_PORT="${STAGING_API_PORT:-15000}"
 STAGING_VM_NAME="${STAGING_VM_NAME:-vampi-staging}"
+STAGING_VM_CPUS="${STAGING_VM_CPUS:-1}"      # see staging/Vagrantfile before raising
+STAGING_VM_MEMORY="${STAGING_VM_MEMORY:-1536}"
 
 # Local traffic must not go through a corporate/desktop HTTP proxy.
 export NO_PROXY="${NO_PROXY:-},${GITLAB_HOST},localhost,127.0.0.1"

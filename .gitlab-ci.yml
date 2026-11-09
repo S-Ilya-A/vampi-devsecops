@@ -304,13 +304,17 @@ deploy-staging:
     url: http://127.0.0.1:18088
   rules:
     - if: $STAGING_SSH_KEY && $STAGING_KNOWN_HOSTS
+  # A hung VM must fail the job in minutes, not hold the staging lock for the
+  # runner's 1 h default (it once did: the guest kernel stalled mid-scp).
+  timeout: 15m
   variables:
     GIT_DEPTH: "1"
   before_script:
     - chmod 600 "$STAGING_SSH_KEY"
     - >-
       SSH_OPTS="-i $STAGING_SSH_KEY -o UserKnownHostsFile=$STAGING_KNOWN_HOSTS
-      -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=10"
+      -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=10
+      -o ServerAliveInterval=10 -o ServerAliveCountMax=3"
     - remote() { ssh $SSH_OPTS -p "$STAGING_SSH_PORT" "deploy@$STAGING_HOST" "$@"; }
   script:
     - scp $SSH_OPTS -P "$STAGING_SSH_PORT" staging/compose.yml "deploy@$STAGING_HOST:/opt/vampi/compose.yml"
@@ -343,6 +347,7 @@ deploy-staging:
   stage: dast
   needs: [deploy-staging]
   resource_group: staging
+  timeout: 30m
   rules:
     - if: $STAGING_SSH_KEY && $STAGING_KNOWN_HOSTS
   image:

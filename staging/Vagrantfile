@@ -13,6 +13,8 @@ ssh_port     = Integer(ENV.fetch("STAGING_SSH_PORT", "2250"))
 web_port     = Integer(ENV.fetch("STAGING_WEB_PORT", "18088"))
 api_port     = Integer(ENV.fetch("STAGING_API_PORT", "15000"))
 deploy_key   = ENV.fetch("STAGING_DEPLOY_PUBKEY", "")
+vm_cpus      = Integer(ENV.fetch("STAGING_VM_CPUS", "1"))
+vm_memory    = Integer(ENV.fetch("STAGING_VM_MEMORY", "1536"))
 host_names   = ENV.fetch("STAGING_HOST_NAMES", "gitlab.northwind.test telemetry.northwind.test")
 
 Vagrant.configure("2") do |config|
@@ -34,8 +36,12 @@ Vagrant.configure("2") do |config|
 
   config.vm.provider "virtualbox" do |vb|
     vb.name = "vampi-staging"
-    vb.memory = 1536
-    vb.cpus = 2
+    vb.memory = vm_memory
+    # One vCPU on purpose. With Docker Desktop installed, Hyper-V owns the CPU's
+    # virtualisation and VirtualBox runs on top of it (NEM mode). There, a
+    # 2-vCPU guest stalled for good under load ("rcu_preempt self-detected
+    # stall", sshd stopped answering). 1 vCPU is enough for this application.
+    vb.cpus = vm_cpus
     vb.linked_clone = true
   end
 
