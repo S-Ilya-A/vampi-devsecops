@@ -88,8 +88,11 @@ set_project_var() {
 }
 # Protected: only pipelines on protected branches (master) get the key, so a pipeline
 # from an arbitrary feature branch cannot deploy or read it.
-set_project_var STAGING_SSH_KEY     "$(cat "$KEY")"          file    true
-set_project_var STAGING_KNOWN_HOSTS "$(cat "$KNOWN_HOSTS")"  file    true
+# $(...) strips the trailing newline, and OpenSSH refuses a private key file
+# without one ("error in libcrypto"), so put it back.
+nl=$'\n'
+set_project_var STAGING_SSH_KEY     "$(cat "$KEY")$nl"          file    true
+set_project_var STAGING_KNOWN_HOSTS "$(cat "$KNOWN_HOSTS")$nl"  file    true
 set_project_var STAGING_HOST        "$STAGING_HOST"          env_var false
 set_project_var STAGING_SSH_PORT    "$STAGING_SSH_PORT"      env_var false
 set_project_var STAGING_WEB_PORT    "$STAGING_WEB_PORT"      env_var false
