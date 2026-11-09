@@ -41,8 +41,9 @@ if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; t
   apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-compose-plugin
 fi
 
-# The local registry is plain HTTP; Docker Hub pulls go through the host's mirror so
-# the VM can be rebuilt offline. Logs stay readable with `docker logs` (local driver
+# The local registry is plain HTTP; Docker Hub pulls go through the host's mirror, so
+# deploys and re-provisioning work offline (creating the VM still needs the network
+# for the packages above). Logs stay readable with `docker logs` (local driver
 # copy) while the fluentd driver set per service ships them.
 daemon_json=$(cat <<EOF
 {
@@ -67,6 +68,17 @@ install -d -m 0700 -o deploy -g deploy /home/deploy/.ssh
 printf '%s\n' "$DEPLOY_PUBKEY" >/home/deploy/.ssh/authorized_keys
 chown deploy:deploy /home/deploy/.ssh/authorized_keys
 chmod 0600 /home/deploy/.ssh/authorized_keys
+
+log "SSH: own host keys"
+# The bento box ships with SSH host keys generated when the box was built, so every
+# VM made from it has the same private key and pinning it would prove nothing.
+# Generate this VM's own keys once; staging-up.sh pins them afterwards.
+if [ ! -e /etc/ssh/.northwind-hostkeys ]; then
+  rm -f /etc/ssh/ssh_host_*
+  ssh-keygen -A
+  touch /etc/ssh/.northwind-hostkeys
+  systemctl restart ssh
+fi
 
 log "SSH: keys only"
 cat >/etc/ssh/sshd_config.d/10-staging.conf <<'EOF'

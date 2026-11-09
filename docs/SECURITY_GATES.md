@@ -6,7 +6,7 @@ The source of truth for what each pipeline gate scans, when it fails and why, an
 
 | Gate | Job | Tool | Scope | Fails when | Artefacts (`reports/`) |
 |---|---|---|---|---|---|
-| SAST | `sast-semgrep` | Semgrep 1.95.0 | Python, JavaScript, Dockerfiles, YAML in the working tree; `tests/` and vendored minified JS excluded (`.semgrepignore`) | any finding of severity **ERROR** | `semgrep.json` |
+| SAST | `sast-semgrep` | Semgrep 1.95.0 | Python, JavaScript, Dockerfiles, YAML in the working tree; `tests/` and vendored minified JS excluded (`.semgrepignore`) | any finding of severity **ERROR**, or any rule timing out on a file (the file was not fully analysed) | `semgrep.json` |
 | Secrets | `secrets-gitleaks` | Gitleaks 8.21.2 | every commit reachable from any branch or tag (`--log-opts=--all` after fetching all refs, `GIT_DEPTH: 0`) | **any** finding | `gitleaks.json` |
 | SBOM | `sbom-syft` | Syft 1.18.1 | `requirements.txt` (pip) and `frontend/package-lock.json` (npm) | does not gate | `sbom.cdx.json` (CycloneDX), `sbom.syft.json` |
 | SCA | `sca-grype` | Grype 0.99.1 | the SBOM above | **High or Critical** vulnerability **with a released fix** | `grype.json` (all severities, fixed and unfixed) |
@@ -20,6 +20,8 @@ Every report holds all severities, and every job uploads its reports even when i
 - **Secrets, zero tolerance.** A leaked credential is exploitable whatever its "severity", and history counts because a deleted file is still in every clone. The only way through is to rotate the credential and record the old value as a suppression (see below).
 - **SCA and images, High/Critical with a fix.** A developer can act on these today by bumping a version or a base image. Blocking on a vulnerability with no fix would block every pipeline on something nobody can change, which teaches people to suppress wholesale. Unfixed vulnerabilities stay in the reports and in the trend report (Task 4), so they are tracked rather than hidden.
 - **Dockerfile misconfiguration, High/Critical.** These are cheap to fix (a `USER` line, `--no-cache`) and running as root is the one that matters for container escape.
+
+**Semgrep timeouts.** Semgrep gives each rule 5 seconds per file and skips the whole file after three timeouts. On a busy runner that happened to `frontend/public/app.js` in pipeline #27, and all six XSS findings disappeared from the report while nothing failed. The trend data showed it: findings appeared and vanished between runs of the same code. The scan now uses `--timeout 60 --timeout-threshold 0` (never skip a file), and `ci/semgrep_gate.py` fails with a COVERAGE line if a rule still times out.
 
 ## Why the project Semgrep rules exist
 

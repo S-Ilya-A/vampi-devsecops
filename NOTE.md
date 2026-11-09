@@ -33,7 +33,7 @@ Steady-state memory use:
 
 A full pipeline takes 25–30 minutes. Most of that is the bounded ZAP active scan (up to 12 minutes) and the image scans.
 
-After the first image pulls everything works offline (§4, "Offline"). Tear-down: `scripts/gitlab-down.sh [--purge]`, `scripts/telemetry-up.sh --down|--purge` and `scripts/staging-up.sh --destroy`.
+After the first image pulls, pipelines, deploys and the telemetry work offline (§4, "Offline"). The one exception is creating the staging VM from scratch (§9). Tear-down: `scripts/gitlab-down.sh [--purge]`, `scripts/telemetry-up.sh --down|--purge` and `scripts/staging-up.sh --destroy`.
 
 Generated secrets live in `.local/` (git-ignored):
 - the GitLab root password and token;
@@ -115,6 +115,7 @@ Disabling a rule, or ignoring a path to make a finding go away, is not allowed.
 - `bento/debian-12`, pinned;
 - Docker from download.docker.com, pulling through the host's registry and mirror;
 - a key-only `deploy` user; password and root SSH logins disabled;
+- the VM's own SSH host keys, generated once: the bento box ships keys made at box build time, so every VM from it shared one host private key, and the pinned key proved nothing until this was found during the final check;
 - a per-VM Postgres password generated on the VM, so it never appears in git or in CI;
 - Fluent Bit with the telemetry CA and the shipper password.
 
@@ -283,6 +284,7 @@ One more caveat about reading the table: #29's Semgrep count of 18 was an incomp
 - **No structured security events in the application.** The application logs only access lines and tracebacks. Behind VirtualBox NAT every client is `10.0.2.2`, so per-client signals are degenerate. Forwarding `X-Forwarded-For` and logging login, password-change and admin events as JSON (the Fluent Bit parser for that is already in place) would make the log analysis far sharper.
 - **No alerting.** Nothing pages anyone when logs go silent or failed logins spike. The trend report shows both, but only when someone runs it. OpenSearch Alerting is installed and unused.
 - **No real-time detection of hung services.** The ReDoS hang showed only as silence; a health-check probe with a log line would catch it.
+- **Creating the VM from scratch needs the network.** Deploys and re-provisioning work offline, but a VM rebuilt with `--destroy` installs Docker Engine and Debian packages from the internet. An apt cache (apt-cacher-ng on the host) or a pre-built box would close this gap.
 - **Unpinned packages in provisioning.** Docker CE and the compose plugin are installed at whatever version download.docker.com serves.
 - **Unsigned baseline tag.** The `baseline` tag is not signed (no GPG key available); commits are not signed either.
 - **No stretch goals.** No Cosign signing, no OPA/Conftest, no MobSF.

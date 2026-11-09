@@ -6,8 +6,9 @@
 #   scripts/staging-up.sh --destroy remove the VM (the deploy key and CI variables stay)
 #
 # Needs: VirtualBox, Vagrant, ssh/ssh-keygen/ssh-keyscan, and GitLab from gitlab-up.sh.
-# After the box and Debian/Docker packages have been downloaded once, the VM can be
-# rebuilt offline: Docker Hub images come through the host's mirror.
+# Deploys and re-provisioning work offline (images come through the host's registry
+# and mirror). Creating the VM from scratch needs the network for Debian and Docker
+# packages.
 source "$(dirname "$0")/lib.sh"
 
 STAGING_DIR="$REPO_ROOT/staging"

@@ -20,10 +20,13 @@ Provisioning (`staging/vm/provision.sh`, idempotent) does five things:
 - installs Docker Engine and the Compose plugin;
 - points Docker at the host's registry and Docker Hub mirror;
 - creates a key-only `deploy` user and disables password and root SSH logins;
+- replaces the SSH host keys baked into the box with the VM's own, once. Every VM made from the bento box otherwise has the same host private key, which would make the pinned key worthless;
 - generates a per-VM Postgres password in `/opt/vampi/.env`, readable only by `deploy`;
 - starts Fluent Bit.
 
-The VM is reproducible from the script alone. After the box, the Debian packages and the images have been fetched once, rebuilding it needs no internet: images come from the local registry and the mirror.
+The VM is reproducible from the script alone. Offline, what works and what does not:
+- **Works offline:** deploying to the existing VM and re-provisioning it. Images come from the local registry and the Docker Hub mirror on the host, and provisioning only installs packages that are missing.
+- **Needs the network:** creating the VM from scratch (`--destroy`, then `staging-up.sh`). The box is cached by Vagrant, but Docker Engine comes from download.docker.com and Debian packages from the Debian mirrors, and neither is cached on the host. Making that offline too would need an apt cache (apt-cacher-ng) or a pre-built box; see NOTE.md §9.
 
 ## How the runner reaches the VM, and the VM reaches the host
 
