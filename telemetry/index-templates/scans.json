@@ -1,0 +1,64 @@
+{
+  "index_patterns": [
+    "scans-*"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": "true",
+      "dynamic_templates": [
+        {
+          "strings": {
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "pipeline_id": {
+          "type": "long"
+        },
+        "pipeline_url": {
+          "type": "keyword"
+        },
+        "commit": {
+          "type": "keyword"
+        },
+        "ref": {
+          "type": "keyword"
+        },
+        "project": {
+          "type": "keyword"
+        },
+        "tool": {
+          "type": "keyword"
+        },
+        "scan": {
+          "type": "keyword"
+        },
+        "job": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "findings": {
+          "type": "integer"
+        },
+        "job_status": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}

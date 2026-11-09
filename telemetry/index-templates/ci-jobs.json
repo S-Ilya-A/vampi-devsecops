@@ -1,0 +1,91 @@
+{
+  "index_patterns": [
+    "ci-jobs-*"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": "true",
+      "dynamic_templates": [
+        {
+          "strings": {
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "pipeline_id": {
+          "type": "long"
+        },
+        "pipeline_url": {
+          "type": "keyword"
+        },
+        "commit": {
+          "type": "keyword"
+        },
+        "ref": {
+          "type": "keyword"
+        },
+        "project": {
+          "type": "keyword"
+        },
+        "job_id": {
+          "type": "long"
+        },
+        "job_name": {
+          "type": "keyword"
+        },
+        "stage": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "keyword"
+        },
+        "duration_s": {
+          "type": "float"
+        },
+        "queued_s": {
+          "type": "float"
+        },
+        "started_at": {
+          "type": "date"
+        },
+        "finished_at": {
+          "type": "date"
+        },
+        "failure_reason": {
+          "type": "keyword"
+        },
+        "allow_failure": {
+          "type": "boolean"
+        },
+        "runner": {
+          "type": "keyword"
+        },
+        "user": {
+          "type": "keyword"
+        },
+        "web_url": {
+          "type": "keyword"
+        },
+        "pipeline_source": {
+          "type": "keyword"
+        },
+        "pipeline_status": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}

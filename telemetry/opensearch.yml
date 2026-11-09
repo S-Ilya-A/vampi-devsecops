@@ -1,0 +1,29 @@
+cluster.name: northwind-telemetry
+network.host: 0.0.0.0
+
+# TLS with the stack's own CA (scripts/telemetry-up.sh). The node certificate
+# names telemetry.northwind.test, opensearch, localhost and 127.0.0.1, so every
+# client verifies it: Fluent Bit on the VM, the CI jobs, the trend CLI, Dashboards.
+plugins.security.ssl.transport.pemcert_filepath: certs/node.pem
+plugins.security.ssl.transport.pemkey_filepath: certs/node.key
+plugins.security.ssl.transport.pemtrustedcas_filepath: certs/ca.pem
+plugins.security.ssl.transport.enforce_hostname_verification: false
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.http.pemcert_filepath: certs/node.pem
+plugins.security.ssl.http.pemkey_filepath: certs/node.key
+plugins.security.ssl.http.pemtrustedcas_filepath: certs/ca.pem
+
+# Create the security index from config/opensearch-security/ on first start.
+plugins.security.allow_default_init_securityindex: true
+# Only a client certificate with this subject may change the security
+# configuration (securityadmin.sh); no password can.
+plugins.security.authcz.admin_dn:
+  - "CN=admin,OU=telemetry,O=Northwind"
+plugins.security.nodes_dn:
+  - "CN=telemetry.northwind.test,OU=telemetry,O=Northwind"
+plugins.security.restapi.roles_enabled: ["all_access"]
+
+# Failed logins and missing privileges on the telemetry store itself go to the
+# security-auditlog-* index. The defaults leave out successful requests, which
+# would otherwise be every bulk write from Fluent Bit and CI.
+plugins.security.audit.type: internal_opensearch

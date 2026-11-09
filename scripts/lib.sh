@@ -55,8 +55,20 @@ STAGING_VM_NAME="${STAGING_VM_NAME:-vampi-staging}"
 STAGING_VM_CPUS="${STAGING_VM_CPUS:-1}"      # see staging/Vagrantfile before raising
 STAGING_VM_MEMORY="${STAGING_VM_MEMORY:-1536}"
 
+# Telemetry (Task 4): OpenSearch + Dashboards in Docker on this machine, published on
+# loopback only. TELEMETRY_HOST resolves to the Docker host gateway in job
+# containers and to 10.0.2.2 on the staging VM (VirtualBox NAT = host loopback).
+TELEMETRY_HOST="${TELEMETRY_HOST:-telemetry.northwind.test}"
+TELEMETRY_BIND="${TELEMETRY_BIND:-127.0.0.1}"
+OPENSEARCH_PORT="${OPENSEARCH_PORT:-9200}"
+DASHBOARDS_PORT="${DASHBOARDS_PORT:-5601}"
+TELEMETRY_PROJECT="${TELEMETRY_PROJECT:-telemetry}"   # docker compose project name
+
+# Names that job containers resolve to the Docker host gateway.
+JOB_HOSTS=("$GITLAB_HOST" "$STAGING_HOST" "$TELEMETRY_HOST")
+
 # Local traffic must not go through a corporate/desktop HTTP proxy.
-export NO_PROXY="${NO_PROXY:-},${GITLAB_HOST},localhost,127.0.0.1"
+export NO_PROXY="${NO_PROXY:-},${GITLAB_HOST},${TELEMETRY_HOST},localhost,127.0.0.1"
 export no_proxy="$NO_PROXY"
 
 PY="$(command -v python3 || command -v python || true)"
@@ -119,6 +131,35 @@ secret_file() {  # secret_file <name>: create a random secret once, print its pa
     mkdir -p "$STATE_DIR"
     # letters+digits only, plus a fixed suffix to satisfy GitLab's complexity rules
     printf '%s' "$(rand_str 24)Aa1!" >"$f"
+    chmod 600 "$f" 2>/dev/null || true
+  fi
+  printf '%s' "$f"
+}
+
+# project_id: id of root/$PROJECT_PATH in GitLab.
+project_id() { api GET "/projects/root%2F$PROJECT_PATH" | json_get 'd["id"]'; }
+
+# set_project_var <project id> <key> <value> <env_var|file> <protected> [masked]
+# Creates or updates a project CI/CD variable.
+set_project_var() {
+  local pid="$1" key="$2"
+  local args=(--data-urlencode "value=$3" --data-urlencode "variable_type=$4"
+              --data-urlencode "protected=$5" --data-urlencode "masked=${6:-false}")
+  if api GET "/projects/$pid/variables/$key" >/dev/null 2>&1; then
+    api PUT "/projects/$pid/variables/$key" "${args[@]}" >/dev/null
+  else
+    api POST "/projects/$pid/variables" --data-urlencode "key=$key" "${args[@]}" >/dev/null
+  fi
+}
+
+# token_file <name>: a random letters-and-digits secret in .local/, created once.
+# Unlike secret_file it has no punctuation, so GitLab can mask it in job logs
+# and it needs no quoting in config files.
+token_file() {
+  local f="$STATE_DIR/$1"
+  if [ ! -s "$f" ]; then
+    mkdir -p "$(dirname "$f")"
+    rand_str 32 >"$f"
     chmod 600 "$f" 2>/dev/null || true
   fi
   printf '%s' "$f"

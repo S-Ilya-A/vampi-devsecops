@@ -1,0 +1,30 @@
+# Authentication for the telemetry store: HTTP basic against the internal user
+# database, nothing else (the image's default also carries disabled examples for
+# Kerberos, LDAP, JWT, proxy and client-cert auth). Applied by scripts/telemetry-up.sh.
+_meta:
+  type: "config"
+  config_version: 2
+
+config:
+  dynamic:
+    # Dashboards' service account. The plugin lets this one user manage the
+    # .kibana index; with the default name (kibanaserver) any other account
+    # Dashboards logs in with is refused there.
+    kibana:
+      multitenancy_enabled: false
+      server_username: dashboards
+      index: ".kibana"
+    http:
+      anonymous_auth_enabled: false
+    authc:
+      basic_internal_auth_domain:
+        description: "HTTP basic against the internal user database"
+        http_enabled: true
+        transport_enabled: true
+        order: 0
+        http_authenticator:
+          type: basic
+          challenge: true
+        authentication_backend:
+          type: intern
+    authz: {}

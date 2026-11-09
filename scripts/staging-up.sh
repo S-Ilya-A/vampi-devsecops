@@ -22,7 +22,14 @@ need ssh ssh-keygen ssh-keyscan curl
 vagrant() { (cd "$STAGING_DIR" && "$VAGRANT" "$@"); }
 
 export STAGING_SSH_PORT STAGING_WEB_PORT STAGING_API_PORT STAGING_VM_CPUS STAGING_VM_MEMORY
-export STAGING_HOST_NAMES="$GITLAB_HOST telemetry.northwind.test"
+export STAGING_HOST_NAMES="$GITLAB_HOST $TELEMETRY_HOST"
+# Fluent Bit on the VM: the telemetry CA and the shipper password (telemetry-up.sh).
+if [ -s "$STATE_DIR/telemetry/certs/ca.pem" ] && [ -s "$STATE_DIR/telemetry/shipper-password" ]; then
+  export TELEMETRY_CA_PEM="$(cat "$STATE_DIR/telemetry/certs/ca.pem")"
+  export TELEMETRY_SHIPPER_PASSWORD="$(cat "$STATE_DIR/telemetry/shipper-password")"
+else
+  warn "no telemetry stack yet: Fluent Bit on the VM will buffer logs (run scripts/telemetry-up.sh, then this again)"
+fi
 
 if [ "${1:-}" = "--destroy" ]; then
   vagrant destroy -f
@@ -84,29 +91,19 @@ ok "deploy user can reach Docker on the VM"
 
 # --------------------------------------------------------------------------- CI variables
 [ -s "$STATE_DIR/root-token" ] || die "no GitLab token; run scripts/gitlab-up.sh first"
-PROJECT_ID=$(api GET "/projects/root%2F$PROJECT_PATH" | json_get 'd["id"]')
+PROJECT_ID=$(project_id)
 
-# set_project_var <key> <value> <variable_type env_var|file> <protected true|false>
-set_project_var() {
-  local args=(--data-urlencode "value=$2" --data-urlencode "variable_type=$3"
-              --data-urlencode "protected=$4" --data-urlencode "masked=false")
-  if api GET "/projects/$PROJECT_ID/variables/$1" >/dev/null 2>&1; then
-    api PUT "/projects/$PROJECT_ID/variables/$1" "${args[@]}" >/dev/null
-  else
-    api POST "/projects/$PROJECT_ID/variables" --data-urlencode "key=$1" "${args[@]}" >/dev/null
-  fi
-}
 # Protected: only pipelines on protected branches (master) get the key, so a pipeline
 # from an arbitrary feature branch cannot deploy or read it.
 # $(...) strips the trailing newline, and OpenSSH refuses a private key file
 # without one ("error in libcrypto"), so put it back.
 nl=$'\n'
-set_project_var STAGING_SSH_KEY     "$(cat "$KEY")$nl"          file    true
-set_project_var STAGING_KNOWN_HOSTS "$(cat "$KNOWN_HOSTS")$nl"  file    true
-set_project_var STAGING_HOST        "$STAGING_HOST"          env_var false
-set_project_var STAGING_SSH_PORT    "$STAGING_SSH_PORT"      env_var false
-set_project_var STAGING_WEB_PORT    "$STAGING_WEB_PORT"      env_var false
-set_project_var STAGING_API_PORT    "$STAGING_API_PORT"      env_var false
+set_project_var "$PROJECT_ID" STAGING_SSH_KEY     "$(cat "$KEY")$nl"          file    true
+set_project_var "$PROJECT_ID" STAGING_KNOWN_HOSTS "$(cat "$KNOWN_HOSTS")$nl"  file    true
+set_project_var "$PROJECT_ID" STAGING_HOST        "$STAGING_HOST"          env_var false
+set_project_var "$PROJECT_ID" STAGING_SSH_PORT    "$STAGING_SSH_PORT"      env_var false
+set_project_var "$PROJECT_ID" STAGING_WEB_PORT    "$STAGING_WEB_PORT"      env_var false
+set_project_var "$PROJECT_ID" STAGING_API_PORT    "$STAGING_API_PORT"      env_var false
 ok "CI variables set (STAGING_SSH_KEY and STAGING_KNOWN_HOSTS are protected)"
 
 cat <<EOF

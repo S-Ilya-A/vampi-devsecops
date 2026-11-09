@@ -205,6 +205,7 @@ else
   # privileged + /certs/client: the existing build jobs use Docker-in-Docker with TLS.
   # if-not-present: once an image is cached, jobs run without network access.
   # host-gateway: job containers reach GitLab and the registry under the same name.
+  extra_hosts=(); for h in "${JOB_HOSTS[@]}"; do extra_hosts+=(--docker-extra-hosts "$h:host-gateway"); done
   docker exec "$RUNNER_CONTAINER" gitlab-runner register --non-interactive \
     --url "$GITLAB_URL" \
     --token "$runner_token" \
@@ -214,17 +215,20 @@ else
     --docker-privileged \
     --docker-volumes /certs/client \
     --docker-volumes "$RUNNER_CACHE_VOLUME:/cache" \
-    --docker-extra-hosts "$GITLAB_HOST:host-gateway"     --docker-extra-hosts "$STAGING_HOST:host-gateway" \
+    "${extra_hosts[@]}" \
     --docker-pull-policy if-not-present >/dev/null
   docker exec "$RUNNER_CONTAINER" sed -i "s/^concurrent = .*/concurrent = ${RUNNER_CONCURRENCY}/" /etc/gitlab-runner/config.toml
   wait_until 60 "runner verification" runner_registered
   ok "runner registered (concurrency $RUNNER_CONCURRENCY)"
 fi
-# Registrations made before the staging VM existed: add its host name.
-if ! docker exec "$RUNNER_CONTAINER" grep -q "$STAGING_HOST:host-gateway" /etc/gitlab-runner/config.toml; then
-  docker exec "$RUNNER_CONTAINER" sed -i "s#\"$GITLAB_HOST:host-gateway\"#\"$GITLAB_HOST:host-gateway\", \"$STAGING_HOST:host-gateway\"#" /etc/gitlab-runner/config.toml
-  ok "runner job containers now resolve $STAGING_HOST"
-fi
+# Registrations made before the staging VM or the telemetry stack existed: add the
+# missing host names next to GitLab's.
+for h in "${JOB_HOSTS[@]}"; do
+  if ! docker exec "$RUNNER_CONTAINER" grep -q "\"$h:host-gateway\"" /etc/gitlab-runner/config.toml; then
+    docker exec "$RUNNER_CONTAINER" sed -i "s#\"$GITLAB_HOST:host-gateway\"#\"$GITLAB_HOST:host-gateway\", \"$h:host-gateway\"#" /etc/gitlab-runner/config.toml
+    ok "runner job containers now resolve $h"
+  fi
+done
 # Registrations made before the shared cache volume existed: switch them over.
 if docker exec "$RUNNER_CONTAINER" grep -q '"/cache"' /etc/gitlab-runner/config.toml; then
   docker exec "$RUNNER_CONTAINER" sed -i "s#\"/cache\"#\"$RUNNER_CACHE_VOLUME:/cache\"#" /etc/gitlab-runner/config.toml

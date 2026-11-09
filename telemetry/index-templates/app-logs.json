@@ -1,0 +1,97 @@
+{
+  "index_patterns": [
+    "app-logs-*"
+  ],
+  "priority": 200,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": "true",
+      "dynamic_templates": [
+        {
+          "strings": {
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "keyword",
+              "ignore_above": 1024
+            }
+          }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "service": {
+          "type": "keyword"
+        },
+        "environment": {
+          "type": "keyword"
+        },
+        "host": {
+          "type": "keyword"
+        },
+        "stream": {
+          "type": "keyword"
+        },
+        "source": {
+          "type": "keyword"
+        },
+        "container_name": {
+          "type": "keyword"
+        },
+        "container_id": {
+          "type": "keyword"
+        },
+        "client_ip": {
+          "type": "keyword"
+        },
+        "method": {
+          "type": "keyword"
+        },
+        "path": {
+          "type": "keyword",
+          "ignore_above": 2048,
+          "fields": {
+            "text": {
+              "type": "text"
+            }
+          }
+        },
+        "protocol": {
+          "type": "keyword"
+        },
+        "status": {
+          "type": "integer"
+        },
+        "bytes": {
+          "type": "keyword"
+        },
+        "referer": {
+          "type": "keyword"
+        },
+        "user_agent": {
+          "type": "keyword"
+        },
+        "remote_user": {
+          "type": "keyword"
+        },
+        "http_time": {
+          "type": "keyword"
+        },
+        "log": {
+          "type": "text"
+        },
+        "event": {
+          "type": "keyword"
+        },
+        "user": {
+          "type": "keyword"
+        }
+      }
+    }
+  }
+}

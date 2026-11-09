@@ -1,0 +1,17 @@
+server.name: northwind-telemetry
+server.host: "0.0.0.0"
+
+opensearch.hosts: ["https://opensearch:9200"]
+opensearch.ssl.verificationMode: full
+opensearch.ssl.certificateAuthorities: ["/usr/share/opensearch-dashboards/config/ca.pem"]
+# Dashboards' own service user; people log in with their own accounts.
+opensearch.username: dashboards
+opensearch.password: ${DASHBOARDS_PASSWORD}
+opensearch.requestHeadersAllowlist: ["securitytenant", "Authorization"]
+
+opensearch_security.auth.type: basicauth
+# One shared (global) space for saved objects; no per-user tenants to keep in sync.
+opensearch_security.multitenancy.enabled: false
+opensearch_security.readonly_mode.roles: ["telemetry_reader"]
+# Served over plain HTTP on loopback only, so the cookie cannot be Secure.
+opensearch_security.cookie.secure: false

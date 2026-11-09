@@ -91,9 +91,22 @@ install -d -m 0755 /opt/telemetry
 install -m 0644 "$SRC/fluent-bit.conf" /opt/telemetry/fluent-bit.conf
 install -m 0644 "$SRC/parsers.conf" /opt/telemetry/parsers.conf
 install -m 0644 "$SRC/telemetry-compose.yml" /opt/telemetry/compose.yml
-docker compose -f /opt/telemetry/compose.yml -p telemetry up -d --quiet-pull
-# Pick up a changed config without a manual restart.
-docker compose -f /opt/telemetry/compose.yml -p telemetry restart >/dev/null
+# The telemetry stack's CA (to verify OpenSearch) and the shipper account's
+# password, from scripts/telemetry-up.sh via staging-up.sh. Without them Fluent Bit
+# still runs and buffers to disk until they arrive.
+if [ -n "${TELEMETRY_CA_PEM:-}" ]; then
+  printf '%s\n' "$TELEMETRY_CA_PEM" >/opt/telemetry/ca.pem
+fi
+[ -s /opt/telemetry/ca.pem ] || : >/opt/telemetry/ca.pem
+chmod 0644 /opt/telemetry/ca.pem
+if [ -n "${TELEMETRY_SHIPPER_PASSWORD:-}" ]; then
+  (umask 077; printf 'OPENSEARCH_PASSWORD=%s\n' "$TELEMETRY_SHIPPER_PASSWORD" >/opt/telemetry/.env)
+fi
+[ -e /opt/telemetry/.env ] || (umask 077; : >/opt/telemetry/.env)
+grep -q '^OPENSEARCH_PASSWORD=.' /opt/telemetry/.env \
+  || echo "WARNING: no telemetry credentials yet (run scripts/telemetry-up.sh, then staging-up.sh); logs are buffered"
+# --force-recreate: picks up a changed config or password without a manual restart.
+docker compose -f /opt/telemetry/compose.yml -p telemetry up -d --quiet-pull --force-recreate
 
 log "done"
 docker --version

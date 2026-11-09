@@ -1,0 +1,26 @@
+# Which user gets which role. The users themselves (with generated password
+# hashes) are in .local/telemetry/internal_users.yml, written by telemetry-up.sh.
+_meta:
+  type: "rolesmapping"
+  config_version: 2
+
+all_access:
+  reserved: true
+  users: ["admin"]
+
+kibana_server:
+  reserved: true
+  users: ["dashboards"]
+
+telemetry_shipper:
+  users: ["shipper"]
+
+telemetry_ci:
+  users: ["ci"]
+
+telemetry_reader:
+  users: ["analyst"]
+
+# Lets the analyst open Dashboards at all (read-only mode is set there).
+kibana_user:
+  users: ["analyst"]

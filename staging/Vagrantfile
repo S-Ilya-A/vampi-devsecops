@@ -15,6 +15,8 @@ api_port     = Integer(ENV.fetch("STAGING_API_PORT", "15000"))
 deploy_key   = ENV.fetch("STAGING_DEPLOY_PUBKEY", "")
 vm_cpus      = Integer(ENV.fetch("STAGING_VM_CPUS", "1"))
 vm_memory    = Integer(ENV.fetch("STAGING_VM_MEMORY", "1536"))
+telemetry_ca = ENV.fetch("TELEMETRY_CA_PEM", "")
+shipper_pw   = ENV.fetch("TELEMETRY_SHIPPER_PASSWORD", "")
 host_names   = ENV.fetch("STAGING_HOST_NAMES", "gitlab.northwind.test telemetry.northwind.test")
 
 Vagrant.configure("2") do |config|
@@ -47,5 +49,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.provision "file", source: "vm", destination: "/tmp/staging-vm"
   config.vm.provision "shell", path: "vm/provision.sh",
-                      env: { "DEPLOY_PUBKEY" => deploy_key, "HOST_NAMES" => host_names }
+                      env: { "DEPLOY_PUBKEY" => deploy_key, "HOST_NAMES" => host_names,
+                             "TELEMETRY_CA_PEM" => telemetry_ca,
+                             "TELEMETRY_SHIPPER_PASSWORD" => shipper_pw }
 end

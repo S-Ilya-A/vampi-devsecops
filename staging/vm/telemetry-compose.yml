@@ -10,12 +10,16 @@ services:
     volumes:
       - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
       - ./parsers.conf:/fluent-bit/etc/parsers-northwind.conf:ro
+      - ./ca.pem:/fluent-bit/etc/telemetry-ca.pem:ro
       - buffer:/var/lib/fluent-bit
     extra_hosts:
       - "telemetry.northwind.test:10.0.2.2"
+    # OPENSEARCH_PASSWORD (shipper account), written by provision.sh, root-only.
+    env_file: .env
     environment:
       OPENSEARCH_HOST: telemetry.northwind.test
       OPENSEARCH_PORT: "9200"
+      OPENSEARCH_USER: shipper
     # Fluent Bit's own logs go to the local driver, not to itself.
     logging:
       driver: local

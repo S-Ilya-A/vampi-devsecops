@@ -1,0 +1,34 @@
+# Roles for the telemetry store, least privilege per writer. Built-in static roles
+# (all_access, kibana_server, kibana_user) are not listed here; they come with
+# the security plugin. Applied by scripts/telemetry-up.sh.
+_meta:
+  type: "roles"
+  config_version: 2
+
+# Fluent Bit on the staging VM: append application logs, nothing else.
+telemetry_shipper:
+  cluster_permissions:
+    - "cluster_monitor"
+    - "indices:data/write/bulk"
+  index_permissions:
+    - index_patterns: ["app-logs-*"]
+      allowed_actions: ["create_index", "indices:data/write/index", "indices:data/write/bulk*", "indices:admin/mapping/put"]
+
+# The pipeline's report job: scanner findings, scan runs, CI job events.
+# It writes documents with fixed ids (re-runs overwrite rather than duplicate),
+# and reads them back for its own summary.
+telemetry_ci:
+  cluster_permissions:
+    - "cluster_monitor"
+    - "indices:data/write/bulk"
+  index_permissions:
+    - index_patterns: ["findings-*", "scans-*", "ci-jobs-*"]
+      allowed_actions: ["create_index", "indices:admin/mapping/put", "write", "read"]
+
+# People and the trend CLI: read everything the three streams write, change nothing.
+telemetry_reader:
+  cluster_permissions:
+    - "cluster_composite_ops_ro"
+  index_permissions:
+    - index_patterns: ["app-logs-*", "findings-*", "scans-*", "ci-jobs-*"]
+      allowed_actions: ["read", "indices:admin/mappings/get", "indices:admin/resolve/index"]
