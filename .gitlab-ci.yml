@@ -317,17 +317,20 @@ deploy-staging:
     # The job token is valid only while this job runs; it is passed on stdin and
     # the VM logs out again, so no registry credential stays on the VM.
     - echo "$CI_REGISTRY_PASSWORD" | remote "docker login -u '$CI_REGISTRY_USER' --password-stdin '$CI_REGISTRY'"
+    # release.env records what is deployed, so `docker compose` on the VM works
+    # for an operator too: docker compose --env-file .env --env-file release.env ps
     - >-
-      remote "cd /opt/vampi && export IMAGE_TAG='$CI_COMMIT_SHORT_SHA' REGISTRY='$CI_REGISTRY' &&
-      docker compose --env-file .env pull --quiet &&
-      docker compose --env-file .env up -d --remove-orphans --wait --wait-timeout 180;
+      remote "cd /opt/vampi &&
+      printf 'IMAGE_TAG=%s\nREGISTRY=%s\nPIPELINE_ID=%s\n' '$CI_COMMIT_SHORT_SHA' '$CI_REGISTRY' '$CI_PIPELINE_ID' >release.env &&
+      docker compose --env-file .env --env-file release.env pull --quiet &&
+      docker compose --env-file .env --env-file release.env up -d --remove-orphans --wait --wait-timeout 180;
       rc=\$?; docker logout '$CI_REGISTRY' >/dev/null; exit \$rc"
     - API="http://$STAGING_HOST:$STAGING_API_PORT"
     - for i in $(seq 1 30); do wget -qO- "$API/" >/dev/null && break; sleep 2; done
     # Staging data is disposable: re-seed the demo users and books on every deploy.
     - wget -qO- "$API/createdb"
     - wget -qO /dev/null "http://$STAGING_HOST:$STAGING_WEB_PORT/"
-    - remote "cd /opt/vampi && docker compose ps --format '{{.Service}} {{.Image}} {{.Status}}'"
+    - remote "cd /opt/vampi && docker compose --env-file .env --env-file release.env ps --format '{{.Service}} {{.Image}} {{.Status}}'"
 
 # --- DAST: OWASP ZAP against staging -----------------------------------------
 # Two scans, because the pen test found almost nothing with an unauthenticated
