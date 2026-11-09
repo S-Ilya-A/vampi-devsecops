@@ -68,9 +68,12 @@ class User(db.Model):
 
     @staticmethod
     def get_user(username):
-        if vuln:  # SQLi Injection
-            user_query = f"SELECT * FROM users WHERE username = '{username}'"
-            query = db.session.execute(text(user_query))
+        if vuln:
+            # Was SQL injection (PT-01): the username was formatted into the query
+            # string. It is now a bound parameter, so the driver sends it as data
+            # and no input can change the statement.
+            query = db.session.execute(text("SELECT * FROM users WHERE username = :username"),
+                                       {"username": username})
             ret = query.fetchone()
             if ret:
                 fin_query = '{"username": "%s", "email": "%s"}' % (ret[1], ret[3])

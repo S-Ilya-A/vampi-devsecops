@@ -140,10 +140,15 @@ def update_email(username):
         return Response(error_message_helper(resp), 401, mimetype="application/json")
     else:
         user = User.query.filter_by(username=resp['sub']).first()
-        if vuln:  # Regex DoS
-            match = re.search(
-                r"^([0-9a-zA-Z]([-.\w]*[0-9a-zA-Z])*@{1}([0-9a-zA-Z][-\w]*[0-9a-zA-Z]\.)+[a-zA-Z]{2,9})$",
-                str(request_data.get('email')))
+        if vuln:
+            # Was a catastrophic-backtracking pattern (PT-11): nested quantifiers
+            # over overlapping classes. A ZAP active scan sent such an address and
+            # the API spent all its CPU on one request until restarted. Each part
+            # of this pattern can match a character in one way only, so the time
+            # is linear in the input, and the input is capped as well.
+            email = str(request_data.get('email'))
+            match = len(email) <= 254 and re.fullmatch(
+                r"[0-9A-Za-z._%+-]+@[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*\.[A-Za-z]{2,24}", email)
             if match:
                 user.email = request_data.get('email')
                 db.session.commit()
