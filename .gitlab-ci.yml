@@ -123,14 +123,17 @@ sast-semgrep:
   image: semgrep/semgrep:1.95.0
   variables:
     SEMGREP_RULESETS: default security-audit owasp-top-ten flask javascript jwt
+    SEMGREP_RULES_URL: https://semgrep.dev/c/p
   cache:
     key: semgrep-registry-rules
+    # A failing gate must still save its data, or the next offline run has none.
+    when: always
     paths: [.semgrep-registry/]
   script:
     - mkdir -p reports .semgrep-registry
     - |
       for p in $SEMGREP_RULESETS; do
-        if curl -sSfL --retry 2 --max-time 60 -o ".semgrep-registry/$p.yml.new" "https://semgrep.dev/c/p/$p"; then
+        if curl -sSfL --retry 2 --max-time 60 -o ".semgrep-registry/$p.yml.new" "$SEMGREP_RULES_URL/$p"; then
           mv ".semgrep-registry/$p.yml.new" ".semgrep-registry/$p.yml"
         else
           rm -f ".semgrep-registry/$p.yml.new"
@@ -198,6 +201,8 @@ sca-grype:
     GRYPE_DB_MAX_ALLOWED_BUILT_AGE: 720h
   cache:
     key: grype-db
+    # A failing gate must still save its data, or the next offline run has none.
+    when: always
     paths: [.grypedb/]
   script:
     - '/grype db update || echo "WARN - could not refresh the vulnerability DB, using the cached copy"'
@@ -228,6 +233,8 @@ sca-grype:
     TRIVY_SKIP_CHECK_UPDATE: "true"
   cache:
     key: trivy-db
+    # A failing gate must still save its data, or the next offline run has none.
+    when: always
     paths: [.trivycache/]
   script:
     - mkdir -p reports
