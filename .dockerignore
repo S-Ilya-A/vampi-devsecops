@@ -6,3 +6,12 @@ frontend/
 docs/
 tests/
 .git/
+.local/
+.semgrep/
+.semgrep-registry/
+.trivycache/
+.grypedb/
+.venv/
+reports/
+ci/
+scripts/

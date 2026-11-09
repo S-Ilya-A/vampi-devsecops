@@ -1,0 +1,122 @@
+# Project rules. The registry rulesets (see .gitlab-ci.yml) found none of the
+# injection or DOM XSS flaws the pen test reported, because the tainted value
+# travels through a local variable or a jQuery call they do not model. These
+# rules encode the house style instead: raw SQL is never built from strings,
+# and markup is never built from strings either.
+#
+# Severity ERROR fails the pipeline, WARNING is reported only (see the SAST gate).
+rules:
+  - id: northwind.python.sqli-string-built-query
+    languages: [python]
+    severity: ERROR
+    message: >-
+      SQL text is built from a formatted or concatenated string and then executed.
+      Use bound parameters (text("... :name").bindparams(name=...)) or the ORM.
+    metadata:
+      cwe: ["CWE-89: SQL Injection"]
+      owasp: ["A03:2021 - Injection"]
+      confidence: HIGH
+    patterns:
+      - pattern-either:
+          - pattern-inside: |
+              $Q = f"..."
+              ...
+          - pattern-inside: |
+              $Q = "..." % $ARGS
+              ...
+          - pattern-inside: |
+              $Q = "...".format(...)
+              ...
+          - pattern-inside: |
+              $Q = "..." + $X
+              ...
+      - pattern-either:
+          - pattern: sqlalchemy.sql.text($Q)
+          - pattern: sqlalchemy.text($Q)
+          - pattern: $SESSION.execute($Q)
+  - id: northwind.python.sqli-inline-formatted-query
+    languages: [python]
+    severity: ERROR
+    message: >-
+      SQL text is built inline from a formatted string. Use bound parameters or the ORM.
+    metadata:
+      cwe: ["CWE-89: SQL Injection"]
+      confidence: HIGH
+    pattern-either:
+      - pattern: sqlalchemy.sql.text(f"...")
+      - pattern: sqlalchemy.text(f"...")
+      - pattern: sqlalchemy.sql.text("..." % $X)
+      - pattern: sqlalchemy.sql.text("...".format(...))
+      - pattern: $SESSION.execute(f"...")
+
+  - id: northwind.python.debug-server-enabled
+    languages: [python]
+    severity: ERROR
+    message: >-
+      The application is started with debug=True. The Werkzeug debugger allows
+      remote code execution and this entry point is what the container runs.
+    metadata:
+      cwe: ["CWE-489: Active Debug Code"]
+      confidence: HIGH
+    pattern: $APP.run(..., debug=True, ...)
+
+  - id: northwind.js.innerhtml-from-variable
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      innerHTML is assigned a non-constant value. Build the DOM with textContent /
+      createElement, or escape every interpolated value.
+    metadata:
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: MEDIUM
+    patterns:
+      - pattern: $EL.innerHTML = $V
+      - pattern-not: $EL.innerHTML = "..."
+      - pattern-not: $EL.innerHTML = ''
+
+  - id: northwind.js.jquery-html-from-concatenation
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      jQuery .html() is given a string built by concatenation. Use .text() for
+      data, or build elements and set their text.
+    metadata:
+      cwe: ["CWE-79: Cross-site Scripting"]
+      confidence: MEDIUM
+    pattern-either:
+      - pattern: $(...).html($A + $B)
+      - pattern: $(...).append($A + $B)
+
+  - id: northwind.js.deep-merge-of-message-data
+    languages: [javascript]
+    severity: ERROR
+    message: >-
+      Data from a postMessage event is deep-merged into an object. Without an
+      origin check and with a vulnerable lodash this is prototype pollution from
+      any page that can frame or open this one. Check event.origin and copy only
+      known keys.
+    metadata:
+      cwe: ["CWE-1321: Prototype Pollution", "CWE-346: Origin Validation Error"]
+      confidence: HIGH
+    patterns:
+      - pattern-inside: |
+          $W.addEventListener('message', function ($EV) { ... })
+      - pattern-either:
+          - pattern: _.merge(..., JSON.parse($EV.data), ...)
+          - pattern: _.merge(..., $EV.data, ...)
+          - pattern: _.defaultsDeep(..., JSON.parse($EV.data), ...)
+
+  - id: northwind.js.token-in-localstorage
+    languages: [javascript]
+    severity: WARNING
+    message: >-
+      An auth token is kept in localStorage, where any script on the origin
+      (including an XSS payload) can read it.
+    metadata:
+      cwe: ["CWE-922: Insecure Storage of Sensitive Information"]
+      confidence: MEDIUM
+    patterns:
+      - pattern: localStorage.setItem($K, $V)
+      - metavariable-regex:
+          metavariable: $K
+          regex: (?i).*token.*

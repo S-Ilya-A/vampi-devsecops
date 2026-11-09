@@ -1,0 +1,14 @@
+# Trivy suppressions (vulnerabilities, misconfigurations, secrets). Each entry
+# needs an id, the narrowest paths/purls that apply, a statement, and an
+# expired_at date after which it stops suppressing and the gate fails again.
+# Every entry is also listed in docs/SECURITY_GATES.md ("Suppressions").
+#
+# Example:
+# vulnerabilities:
+#   - id: CVE-2099-0001
+#     purls: ["pkg:pypi/example@1.0.0"]
+#     statement: "S-NN: not reachable because ..., see docs/SECURITY_GATES.md"
+#     expired_at: 2027-01-31
+vulnerabilities: []
+misconfigurations: []
+secrets: []

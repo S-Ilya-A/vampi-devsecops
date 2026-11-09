@@ -1,0 +1,13 @@
+# Replaces Semgrep's built-in ignore list, so everything skipped is listed here.
+.git/
+.venv/
+node_modules/
+# third-party minified copies made by `npm run vendor`; covered by SCA instead
+frontend/public/vendor/
+# scanner caches restored by CI
+.semgrep-registry/
+.trivycache/
+.grypedb/
+reports/
+# test code is not shipped in any image
+tests/

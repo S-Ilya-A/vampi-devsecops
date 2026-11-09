@@ -1,0 +1,13 @@
+# Gitleaks configuration: the default rules, plus reviewed suppressions.
+# Every suppression is listed in docs/SECURITY_GATES.md ("Suppressions") and is
+# as narrow as possible: one exact value, never a path or a whole rule.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "S-01: expired example JWT in the OpenAPI spec (docs/SECURITY_GATES.md)"
+# Exactly this token (exp 2022-12-04, sub John.Doe), wherever the line moves to.
+regexTarget = "match"
+regexes = [
+  '''eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9\.eyJleHAiOjE2NzAxNjA2MTcsImlhdCI6MTY3MDE2MDU1Nywic3ViIjoiSm9obi5Eb2UifQ\.n17N4AxTbL4_z65-NR46meoytauPDjImUxrLiUMSTQw''',
+]
