@@ -1,0 +1,11 @@
+{
+  "_comment": "ZAP suppressions read by ci/zap_gate.py. Each entry covers one rule (pluginid) on URLs matching uri_regex, needs a reason, and stops applying after expires. List every entry in docs/SECURITY_GATES.md too.",
+  "_example": {
+    "id": "S-NN",
+    "pluginid": "10021",
+    "uri_regex": "^http://staging\\.northwind\\.test:18088/vendor/",
+    "reason": "why this is a false positive",
+    "expires": "2027-01-31"
+  },
+  "suppressions": []
+}

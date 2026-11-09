@@ -2,6 +2,8 @@ stages:
   - test
   - build
   - scan
+  - deploy
+  - dast
 
 variables:
   API_IMAGE: $CI_REGISTRY_IMAGE/api
@@ -282,3 +284,97 @@ scan-image-frontend:
     NAME: frontend
     IMAGE: $FRONTEND_IMAGE
     DOCKERFILE: frontend/Dockerfile
+
+# --- Staging: deploy the images this pipeline built, over SSH ---------------
+# The VM comes from scripts/staging-up.sh, which also sets the STAGING_* CI
+# variables. The SSH key and pinned host key are protected variables, so only
+# pipelines on protected branches can deploy; elsewhere this job does not exist.
+#
+# Staging deploys even when a gate above failed: it is the target the DAST gate
+# scans, not a release. A production deploy would need every gate to pass.
+deploy-staging:
+  stage: deploy
+  needs: [build-api, build-frontend]
+  image:
+    name: alpine/git:v2.47.2
+    entrypoint: [""]
+  resource_group: staging
+  environment:
+    name: staging
+    url: http://127.0.0.1:18088
+  rules:
+    - if: $STAGING_SSH_KEY && $STAGING_KNOWN_HOSTS
+  variables:
+    GIT_DEPTH: "1"
+  before_script:
+    - chmod 600 "$STAGING_SSH_KEY"
+    - >-
+      SSH_OPTS="-i $STAGING_SSH_KEY -o UserKnownHostsFile=$STAGING_KNOWN_HOSTS
+      -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=10"
+    - remote() { ssh $SSH_OPTS -p "$STAGING_SSH_PORT" "deploy@$STAGING_HOST" "$@"; }
+  script:
+    - scp $SSH_OPTS -P "$STAGING_SSH_PORT" staging/compose.yml "deploy@$STAGING_HOST:/opt/vampi/compose.yml"
+    # The job token is valid only while this job runs; it is passed on stdin and
+    # the VM logs out again, so no registry credential stays on the VM.
+    - echo "$CI_REGISTRY_PASSWORD" | remote "docker login -u '$CI_REGISTRY_USER' --password-stdin '$CI_REGISTRY'"
+    - >-
+      remote "cd /opt/vampi && export IMAGE_TAG='$CI_COMMIT_SHORT_SHA' REGISTRY='$CI_REGISTRY' &&
+      docker compose --env-file .env pull --quiet &&
+      docker compose --env-file .env up -d --remove-orphans --wait --wait-timeout 180;
+      rc=\$?; docker logout '$CI_REGISTRY' >/dev/null; exit \$rc"
+    - API="http://$STAGING_HOST:$STAGING_API_PORT"
+    - for i in $(seq 1 30); do wget -qO- "$API/" >/dev/null && break; sleep 2; done
+    # Staging data is disposable: re-seed the demo users and books on every deploy.
+    - wget -qO- "$API/createdb"
+    - wget -qO /dev/null "http://$STAGING_HOST:$STAGING_WEB_PORT/"
+    - remote "cd /opt/vampi && docker compose ps --format '{{.Service}} {{.Image}} {{.Status}}'"
+
+# --- DAST: OWASP ZAP against staging -----------------------------------------
+# Two scans, because the pen test found almost nothing with an unauthenticated
+# crawl (docs/PENTEST_SUMMARY.md):
+#   baseline  passive crawl of the web client; gate: Medium risk or above
+#   api       active scan of every operation in the OpenAPI definition, with a
+#             bearer token for a user it registers itself; gate: High risk
+# Reports: reports/zap-*.json (+ HTML). Suppressions: .zap/suppressions.json.
+.zap:
+  stage: dast
+  needs: [deploy-staging]
+  resource_group: staging
+  rules:
+    - if: $STAGING_SSH_KEY && $STAGING_KNOWN_HOSTS
+  image:
+    name: zaproxy/zap-stable:2.16.1
+    entrypoint: [""]
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths: [reports/]
+  before_script:
+    - mkdir -p reports
+    # The ZAP scripts write their reports to /zap/wrk.
+    - ln -sfn "$CI_PROJECT_DIR/reports" /zap/wrk
+
+dast-zap-baseline:
+  extends: .zap
+  script:
+    - >-
+      /zap/zap-baseline.py -t "http://$STAGING_HOST:$STAGING_WEB_PORT/" -m 3 -j -I
+      -J zap-baseline.json -r zap-baseline.html
+    - python3 ci/zap_gate.py reports/zap-baseline.json --fail-on medium --suppressions .zap/suppressions.json
+
+dast-zap-api:
+  extends: .zap
+  variables:
+    # Bounded active scan: at most 2 minutes per rule and 12 minutes overall.
+    ZAP_LIMITS: -config scanner.maxRuleDurationInMins=2 -config scanner.maxScanDurationInMins=12
+  script:
+    - API="http://$STAGING_HOST:$STAGING_API_PORT"
+    - python3 ci/dast_session.py "$API" .dast-token
+    # ZAP adds this header to every request it sends (ZAP_AUTH_HEADER_* are read
+    # by ZAP itself), so the active scan reaches the endpoints behind the login.
+    - export ZAP_AUTH_HEADER=Authorization ZAP_AUTH_HEADER_VALUE="Bearer $(cat .dast-token)" ZAP_AUTH_HEADER_SITE="$STAGING_HOST"
+    - >-
+      /zap/zap-api-scan.py -t "$API/openapi.json" -f openapi -O "$API" -I
+      -z "$ZAP_LIMITS"
+      -J zap-api.json -r zap-api.html
+    - python3 ci/zap_gate.py reports/zap-api.json --fail-on high --suppressions .zap/suppressions.json
