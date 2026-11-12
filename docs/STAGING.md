@@ -43,6 +43,30 @@ These names were chosen over a host-only network for two reasons:
 - **Nothing outside the laptop is exposed.** A host-only adapter creates a network the host and any other VM on it can reach.
 - **It needs no route from Docker Desktop's VM into a VirtualBox network.** That route differs between Windows, macOS and Linux.
 
+### When a forwarded port does not work
+
+VirtualBox only logs a port forward it could not set up (`failed to set up redirection of 18088 to 8088` in `VBox.log`). The VM starts without it and Vagrant reports success. The first visible symptom was a deploy job failing with `connection refused` on the web client (#34).
+
+On Windows the usual cause is Hyper-V: at every boot it reserves blocks of 100 TCP ports out of the dynamic port range, and the blocks differ from boot to boot. On the development laptop that range starts at 1024 instead of the Windows default 49152, so any port of this stand can be taken. List the reserved blocks with:
+
+```
+netsh interface ipv4 show excludedportrange protocol=tcp
+```
+
+`staging-up.sh` therefore checks, after the VM is up, that all three forwarded ports accept connections on the host, and stops with an explanation if one does not. To move a port, set it and re-run. The script reboots the VM to apply it and updates the CI variable:
+
+```bash
+STAGING_WEB_PORT=28088 scripts/staging-up.sh    # also STAGING_SSH_PORT, STAGING_API_PORT
+```
+
+The setting is not remembered: use the same variable on later runs, or the script moves the port back. The durable fix is on the Windows side, as Administrator, followed by a reboot: put the dynamic range back to the default, which keeps Hyper-V's reservations away from every port this stand uses.
+
+```
+netsh int ipv4 set dynamicport tcp start=49152 num=16384
+```
+
+Docker Desktop has the same problem with its published ports (GitLab 8929/5050/5051, OpenSearch 9200, Dashboards 5601), but there the container fails to start with "port is not available", so it cannot go unnoticed.
+
 ## Deploy (`deploy-staging`)
 
 The job runs on protected branches only, because the SSH key is a protected variable. It does the following:

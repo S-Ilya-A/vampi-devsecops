@@ -54,11 +54,14 @@ export STAGING_DEPLOY_PUBKEY
 state=$(vagrant status --machine-readable 2>/dev/null | awk -F, '$3=="state"{print $4}' | tr -d '\r')
 case "$state" in
   running)
-    # CPU and memory only change at boot; `vagrant provision` would leave them.
+    # CPU, memory and forwarded ports only change at boot; `vagrant provision`
+    # would leave them. Forwarding lines look like
+    #   Forwarding(1)="name,tcp,127.0.0.1,<host port>,,<guest port>"
     VBOXMANAGE=$(find_tool VBoxManage "/c/Program Files/Oracle/VirtualBox/VBoxManage.exe")
-    have=$("$VBOXMANAGE" showvminfo "$STAGING_VM_NAME" --machinereadable | tr -d '\r' \
-           | awk -F= '{v[$1]=$2} END{printf "cpus=%s memory=%s ", v["cpus"], v["memory"]}')
-    want="cpus=$STAGING_VM_CPUS memory=$STAGING_VM_MEMORY "
+    have=$("$VBOXMANAGE" showvminfo "$STAGING_VM_NAME" --machinereadable | tr -d '\r"' \
+           | awk -F'[=,]' '/^Forwarding/ {port[$7]=$5} {v[$1]=$2}
+               END{printf "cpus=%s memory=%s ssh=%s web=%s api=%s ", v["cpus"], v["memory"], port["22"], port["8088"], port["5000"]}')
+    want="cpus=$STAGING_VM_CPUS memory=$STAGING_VM_MEMORY ssh=$STAGING_SSH_PORT web=$STAGING_WEB_PORT api=$STAGING_API_PORT "
     if [ "$have" != "$want" ]; then
       log "VM has ${have}but the configuration says ${want}; rebooting it to apply"
       vagrant reload --provision
@@ -74,6 +77,28 @@ case "$state" in
     vagrant up --provision ;;
 esac
 ok "VM $STAGING_VM_NAME up"
+
+# --------------------------------------------------------------------------- forwarded ports
+# VirtualBox only logs a port forward it could not set up; the VM starts without
+# it and Vagrant reports success. It happens on Windows when Hyper-V has reserved
+# a block of ports that contains ours (the blocks change with every reboot), and
+# the first symptom would be a deploy job failing with "connection refused".
+# A forwarded port accepts connections on the host even when nothing listens in
+# the guest yet, so this check also works before the first deploy.
+unforwarded=""
+for port in "$STAGING_SSH_PORT" "$STAGING_WEB_PORT" "$STAGING_API_PORT"; do
+  (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null || unforwarded+=" $port"
+done
+if [ -n "$unforwarded" ]; then
+  warn "VirtualBox is not forwarding host port(s)$unforwarded to the VM."
+  warn "Something else holds the port, or (Windows) it is in a reserved range:"
+  warn "  netsh interface ipv4 show excludedportrange protocol=tcp"
+  warn "Pick a free port and re-run; the VM is rebooted to apply it, for example:"
+  warn "  STAGING_WEB_PORT=28088 scripts/staging-up.sh"
+  warn "(STAGING_SSH_PORT, STAGING_WEB_PORT, STAGING_API_PORT; see docs/STAGING.md)"
+  die "port forwarding to the staging VM is incomplete"
+fi
+ok "forwarded ports answer on the host: $STAGING_SSH_PORT $STAGING_WEB_PORT $STAGING_API_PORT"
 
 # --------------------------------------------------------------------------- host key
 # Pin the VM's host key so the deploy job never trusts whatever answers on the port.

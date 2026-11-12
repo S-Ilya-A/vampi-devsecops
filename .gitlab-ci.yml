@@ -341,7 +341,7 @@ deploy-staging:
   resource_group: staging
   environment:
     name: staging
-    url: http://127.0.0.1:18088
+    url: http://127.0.0.1:$STAGING_WEB_PORT
   rules:
     - if: $STAGING_SSH_KEY && $STAGING_KNOWN_HOSTS
   # A hung VM must fail the job in minutes, not hold the staging lock for the
@@ -458,14 +458,11 @@ telemetry-report:
   rules:
     - if: $TELEMETRY_URL && $TELEMETRY_PASSWORD
       when: always
-  needs:
-    - { job: sast-semgrep, artifacts: true, optional: true }
-    - { job: secrets-gitleaks, artifacts: true, optional: true }
-    - { job: sca-grype, artifacts: true, optional: true }
-    - { job: scan-image-api, artifacts: true, optional: true }
-    - { job: scan-image-frontend, artifacts: true, optional: true }
-    - { job: dast-zap-baseline, artifacts: true, optional: true }
-    - { job: dast-zap-api, artifacts: true, optional: true }
+  # No `needs` on purpose: a job in the last stage without it waits for every
+  # earlier stage to finish and downloads all their artefacts. With `needs` on
+  # the scanner jobs it started as soon as the DAST jobs were skipped after a
+  # failed deploy, while an image scan was still running (#34), and recorded
+  # that scan as missing.
   variables:
     GIT_DEPTH: "1"
     PYTHONPATH: tools
