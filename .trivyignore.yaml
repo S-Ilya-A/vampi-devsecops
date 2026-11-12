@@ -11,4 +11,12 @@
 #     expired_at: 2027-01-31
 vulnerabilities: []
 misconfigurations: []
-secrets: []
+secrets:
+  # S-01: the documentation example JWT in the OpenAPI definition, which is copied
+  # into the API image. Expired in 2022, for a user that does not exist.
+  # The same value is allowlisted for Gitleaks (.gitleaks.toml).
+  - id: jwt-token
+    paths:
+      - "/vampi/openapi_specs/openapi3.yml"
+    statement: "S-01: documentation example token, see docs/SECURITY_GATES.md"
+    expired_at: 2027-05-01

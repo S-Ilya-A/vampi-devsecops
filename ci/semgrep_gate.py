@@ -5,7 +5,10 @@ usage: semgrep_gate.py REPORT [--fail-on ERROR|WARNING|INFO]
 
 Findings at or above --fail-on make the exit status 1. Findings suppressed with
 `nosemgrep` never reach the report, so they cannot block; they are listed in
-docs/SUPPRESSIONS.md instead.
+docs/SECURITY_GATES.md instead.
+
+A rule that timed out on a file also makes the exit status 1: that file was not
+fully analysed, so "no findings" for it would be a guess.
 """
 import argparse
 import json

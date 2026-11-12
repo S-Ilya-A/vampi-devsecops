@@ -166,7 +166,8 @@ sast-semgrep:
     - python3 ci/semgrep_gate.py reports/semgrep.json --fail-on ERROR
 
 # --- Secrets: the full history of every branch and tag ----------------------
-# Gate: any finding. Suppression only by fingerprint in .gitleaksignore.
+# Gate: any finding. Suppression only by an exact-value allowlist in
+# .gitleaks.toml or a fingerprint in .gitleaksignore (docs/SECURITY_GATES.md).
 secrets-gitleaks:
   extends: .security-report
   stage: test
@@ -256,9 +257,10 @@ sca-grype:
     TRIVY_IGNOREFILE: .trivyignore.yaml
     # Misconfiguration checks embedded in the pinned Trivy release: deterministic and offline.
     TRIVY_SKIP_CHECK_UPDATE: "true"
-    # The nginx base image ships gettext's libintl jars, so the Java DB is needed.
-    # It is refreshed in its own step below (with the same cached fallback) and
-    # the scans themselves never try to download it.
+    # An image can contain jars Trivy wants its Java DB for (the earlier
+    # nginx:1.21 base did: gettext's libintl). The DB is refreshed in its own
+    # step below (with the same cached fallback) and the scans themselves never
+    # try to download it.
     TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1
     TRIVY_SKIP_JAVA_DB_UPDATE: "true"
   cache:
@@ -277,11 +279,16 @@ sca-grype:
       --list-all-pkgs --format json -o "reports/trivy-image-$NAME.json" "$IMAGE:$CI_COMMIT_SHORT_SHA"
     - trivy convert --format cyclonedx -o "reports/sbom-image-$NAME.cdx.json" "reports/trivy-image-$NAME.json"
     - trivy config --format json -o "reports/trivy-config-$NAME.json" "$DOCKERFILE"
-    # Gates. Both run, so one failure does not hide the other.
+    # Gates. All three run, so one failure does not hide another.
     - rc=0
     - >-
-      trivy image --skip-db-update --scanners vuln,secret --image-config-scanners secret
+      trivy image --skip-db-update --scanners vuln
       --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 "$IMAGE:$CI_COMMIT_SHORT_SHA" || rc=1
+    # Secrets block at every severity (Trivy rates a JWT only Medium); the one
+    # known false positive is S-01 in .trivyignore.yaml.
+    - >-
+      trivy image --skip-db-update --scanners secret --image-config-scanners secret
+      --exit-code 1 "$IMAGE:$CI_COMMIT_SHORT_SHA" || rc=1
     - trivy config --severity HIGH,CRITICAL --exit-code 1 "$DOCKERFILE" || rc=1
     - exit $rc
 
