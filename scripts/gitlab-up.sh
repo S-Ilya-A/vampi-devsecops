@@ -282,7 +282,7 @@ elif [ "$NEW_PIPELINE" = 1 ]; then
   # the one from before the staging and telemetry CI variables existed.
   status=$(api GET "/projects/$PROJECT_ID/pipelines/$pipeline_id" | json_get 'd["status"]')
   case "$status" in
-    success|failed|canceled|skipped)
+    success|failed|canceled|canceling|skipped)
       log "Pipeline #$pipeline_id already finished ($status); starting a new one on $BRANCH"
       pipeline_id=$(api POST "/projects/$PROJECT_ID/pipeline?ref=$BRANCH" | json_get 'd["id"]') ;;
   esac
