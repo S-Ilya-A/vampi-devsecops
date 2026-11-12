@@ -1,17 +1,15 @@
-Dockerfile
-.dockerignore
-README.md
-docker-compose.yaml
-frontend/
-docs/
-tests/
-.git/
-.local/
-.semgrep/
-.semgrep-registry/
-.trivycache/
-.grypedb/
-.venv/
-reports/
-ci/
-scripts/
+# Allow-list: the API image gets the application and nothing else. A deny-list
+# let everything new into the image by default: CI configuration, the staging and
+# telemetry set-up, and on a developer machine staging/.vagrant with the VM's
+# private key (Trivy's secret scan found it in a locally built image).
+*
+!app.py
+!config.py
+!requirements.txt
+!api_views/
+!models/
+!database/
+!openapi_specs/
+**/__pycache__/
+**/*.pyc
+database/*.db
