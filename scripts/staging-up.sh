@@ -26,8 +26,9 @@ export STAGING_SSH_PORT STAGING_WEB_PORT STAGING_API_PORT STAGING_VM_CPUS STAGIN
 export STAGING_HOST_NAMES="$GITLAB_HOST $TELEMETRY_HOST"
 # Fluent Bit on the VM: the telemetry CA and the shipper password (telemetry-up.sh).
 if [ -s "$STATE_DIR/telemetry/certs/ca.pem" ] && [ -s "$STATE_DIR/telemetry/shipper-password" ]; then
-  export TELEMETRY_CA_PEM="$(cat "$STATE_DIR/telemetry/certs/ca.pem")"
-  export TELEMETRY_SHIPPER_PASSWORD="$(cat "$STATE_DIR/telemetry/shipper-password")"
+  TELEMETRY_CA_PEM="$(cat "$STATE_DIR/telemetry/certs/ca.pem")"
+  TELEMETRY_SHIPPER_PASSWORD="$(cat "$STATE_DIR/telemetry/shipper-password")"
+  export TELEMETRY_CA_PEM TELEMETRY_SHIPPER_PASSWORD
 else
   warn "no telemetry stack yet: Fluent Bit on the VM will buffer logs (run scripts/telemetry-up.sh, then this again)"
 fi
@@ -46,7 +47,8 @@ if [ ! -s "$KEY" ]; then
 else
   ok "deploy key exists"
 fi
-export STAGING_DEPLOY_PUBKEY="$(cat "$KEY.pub")"
+STAGING_DEPLOY_PUBKEY="$(cat "$KEY.pub")"
+export STAGING_DEPLOY_PUBKEY
 
 # --------------------------------------------------------------------------- VM
 state=$(vagrant status --machine-readable 2>/dev/null | awk -F, '$3=="state"{print $4}' | tr -d '\r')

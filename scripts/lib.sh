@@ -59,7 +59,6 @@ STAGING_VM_MEMORY="${STAGING_VM_MEMORY:-1536}"
 # loopback only. TELEMETRY_HOST resolves to the Docker host gateway in job
 # containers and to 10.0.2.2 on the staging VM (VirtualBox NAT = host loopback).
 TELEMETRY_HOST="${TELEMETRY_HOST:-telemetry.northwind.test}"
-TELEMETRY_BIND="${TELEMETRY_BIND:-127.0.0.1}"
 OPENSEARCH_PORT="${OPENSEARCH_PORT:-9200}"
 DASHBOARDS_PORT="${DASHBOARDS_PORT:-5601}"
 TELEMETRY_PROJECT="${TELEMETRY_PROJECT:-telemetry}"   # docker compose project name

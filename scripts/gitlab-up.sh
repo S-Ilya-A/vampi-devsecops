@@ -4,6 +4,10 @@
 #
 #   scripts/gitlab-up.sh              full bring-up, waits for the pipeline
 #   scripts/gitlab-up.sh --no-wait    do not wait for the pipeline result
+#   scripts/gitlab-up.sh --run        start a new pipeline if this commit's newest one
+#                                     has already finished (for example after
+#                                     telemetry-up.sh and staging-up.sh added the CI
+#                                     variables that enable deploy, DAST and telemetry)
 #
 # Generated credentials go to .local/ (git-ignored):
 #   root-password  GitLab root password (UI login)
@@ -13,10 +17,12 @@
 source "$(dirname "$0")/lib.sh"
 
 WAIT_PIPELINE=1
+NEW_PIPELINE=0
 for a in "$@"; do
   case "$a" in
     --no-wait) WAIT_PIPELINE=0 ;;
-    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    --run) NEW_PIPELINE=1 ;;
+    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     *) die "unknown option: $a" ;;
   esac
 done
@@ -271,6 +277,15 @@ done
 if [ -z "$pipeline_id" ]; then
   log "No pipeline for $SHA yet; creating one on $BRANCH"
   pipeline_id=$(api POST "/projects/$PROJECT_ID/pipeline?ref=$BRANCH" | json_get 'd["id"]')
+elif [ "$NEW_PIPELINE" = 1 ]; then
+  # Without --run a re-run reports the commit's existing pipeline, which may be
+  # the one from before the staging and telemetry CI variables existed.
+  status=$(api GET "/projects/$PROJECT_ID/pipelines/$pipeline_id" | json_get 'd["status"]')
+  case "$status" in
+    success|failed|canceled|skipped)
+      log "Pipeline #$pipeline_id already finished ($status); starting a new one on $BRANCH"
+      pipeline_id=$(api POST "/projects/$PROJECT_ID/pipeline?ref=$BRANCH" | json_get 'd["id"]') ;;
+  esac
 fi
 ok "pipeline #$pipeline_id: $GITLAB_URL/root/$PROJECT_PATH/-/pipelines/$pipeline_id"
 
