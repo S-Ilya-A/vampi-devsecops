@@ -44,9 +44,9 @@ Each document also carries `pipeline_id`, `commit`, `ref` and the run's timestam
 - the random user name the DAST session registers;
 - ZAP's attack payloads.
 
-ZAP needed the most care. Its active rules put payloads into every URL path segment, so a first version produced 4,165 one-off "findings" from one API scan, almost all of them "client error" responses to URLs like `/users/v1/<!--#EXEC cmd="ls /"-->/email`. Each URL now folds into the OpenAPI path template it matches (`PUT /users/v1/{username}/email`). The API scan then reports 71 findings, and they can be compared between runs. A version bump does change the fingerprint (`lodash 4.17.15` → `4.17.21`), so the old finding shows as resolved.
+ZAP needed the most care. Its active rules put payloads into every URL path segment, so a first version produced 4,165 one-off "findings" from one API scan, almost all of them "client error" responses to URLs like `/users/v1/<!--#EXEC cmd="ls /"-->/email`. Each URL now folds into the OpenAPI path template it matches (`PUT /users/v1/{username}/email`). That left 71 findings, but low and informational ones still appeared and vanished between identical runs: ZAP keeps only a sample of URLs for such alerts, and the sample changes. So Medium and High alerts are one finding per endpoint, and low and informational alerts are one finding per alert. The same API scan is now about ten findings, so repeated runs of the same code compare equal. A version bump does change the fingerprint (`lodash 4.17.15` → `4.17.21`), so the old finding shows as resolved.
 
-**Missing is not zero.** The report job runs after everything else, even when gates failed. It records every scan, and a scan whose job did not run or wrote no report gets status `missing` (or `unreadable`). The trend tool does not compare such a scan, so "Gitleaks did not run" never shows up as "the leaked key is resolved".
+**Missing is not zero.** The report job runs after everything else, even when gates failed. It records every scan, and a scan whose job did not run or wrote no report gets status `missing` (or `unreadable`), and a Semgrep scan in which a rule timed out gets `incomplete`. The trend tool does not compare such a scan, so "Gitleaks did not run" never shows up as "the leaked key is resolved".
 
 **Secret values never leave the pipeline.** The Gitleaks normaliser drops the `Secret` and `Match` fields and keeps the rule, the file and the commit.
 
@@ -98,7 +98,7 @@ The "worth a look" signals:
 
 The `telemetry-report` job prints the report for its own branch and keeps `reports/trend.txt` and `trend.json` as artefacts. In CI the application-log section says "not available with this account", because the CI account cannot read logs.
 
-`tools/tests/` holds 38 unit tests. They run in the `telemetry-tests` job: standard library only, no server needed. They cover:
+`tools/tests/` holds 40 unit tests. They run in the `telemetry-tests` job: standard library only, no server needed. They cover:
 - the duration and date parsing;
 - each normaliser, including fingerprint stability under line moves and tag changes, ZAP endpoint folding and suppression expiry;
 - the rule that secret values are dropped;

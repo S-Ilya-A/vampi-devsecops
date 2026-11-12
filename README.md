@@ -2,6 +2,15 @@
 > web client and a GitLab CI pipeline added. See [`ASSIGNMENT.md`](ASSIGNMENT.md) and
 > [`docs/BASELINE.md`](docs/BASELINE.md). Quick start: `docker compose up --build`, then
 > `curl localhost:5000/createdb` and open http://localhost:8088.
+>
+> **The submission starts at [`NOTE.md`](NOTE.md)**: what was built, how to run it, the gates,
+> the staging VM, the telemetry and the fixes. Details are in
+> [`docs/SECURITY_GATES.md`](docs/SECURITY_GATES.md), [`docs/STAGING.md`](docs/STAGING.md) and
+> [`docs/TELEMETRY.md`](docs/TELEMETRY.md).
+>
+> The text below is upstream VAmPI's README. Two of the vulnerabilities it lists are fixed in
+> this fork: the SQL injection in the user lookup and the regular-expression denial of service
+> on the e-mail update (NOTE.md §7).
 
 # VAmPI
 **The Vulnerable API** *(Based on OpenAPI 3)*

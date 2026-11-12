@@ -1,0 +1,99 @@
+Trend report  since 2026-11-12T06:33:29+00:00  ref master  (generated 2026-11-12T14:33:29+00:00)
+
+== Findings per tool per pipeline run  (- = no complete report from that tool)
+pipeline  time (UTC)        commit    ref     semgrep  gitleaks  grype  trivy  zap
+--------  ----------------  --------  ------  -------  --------  -----  -----  ---
+70        2026-11-12 14:19  99249432  master       16         1     18    118   93
+69        2026-11-12 14:05  99249432  master       16         1     18    118   96
+68        2026-11-12 13:47  712d1fd2  master       16         1     18    118  103
+34        2026-11-12 12:12  24115c14  master       16         1     18     56    -
+33        2026-11-12 11:25  c1fcb47c  master       16         1     18      -    -
+
+== Severity distribution, newest run (#70)
+tool      critical  high  medium  low  info
+--------  --------  ----  ------  ---  ----
+semgrep          0     8       8    0     0
+gitleaks         0     1       0    0     0
+grype            1     7       8    2     0
+trivy            2    37      29   50     0
+zap              0     0       4   46    43
+
+== Severity distribution, all runs in the window
+tool      critical  high  medium  low  info
+--------  --------  ----  ------  ---  ----
+semgrep          0    40      40    0     0
+gitleaks         0     5       0    0     0
+grype            5    35      40   10     0
+trivy            7   136     112  155     0
+zap              0     2      14  144   132
+
+== Changes between runs
+#68 -> #69: 8 new, 241 recurring, 15 resolved
+tool      new  recurring  resolved
+--------  ---  ---------  --------
+gitleaks    0          1         0
+grype       0         18         0
+semgrep     0         16         0
+trivy       0        118         0
+zap         8         88        15
+
+New (most severe first):
+severity  scan      finding                                                       location
+--------  --------  ------------------------------------------------------------  ---------------------------
+low       dast:api  Server Leaks Version Information via "Server" HTTP Response   DELETE /users/v1/{username}
+low       dast:api  ZAP is Out of Date                                            GET /books/v1/{book_title}
+low       dast:web  Insufficient Site Isolation Against Spectre Vulnerability     GET /style.css
+low       dast:web  Insufficient Site Isolation Against Spectre Vulnerability     GET /robots.txt
+low       dast:web  ZAP is Out of Date                                            GET /style.css
+info      dast:web  Modern Web Application                                        GET /robots.txt
+info      dast:web  Storable and Cacheable Content                                GET /robots.txt
+info      dast:web  Storable and Cacheable Content                                GET /style.css
+
+Resolved (most severe first):
+severity  scan      finding                                                       location
+--------  --------  ------------------------------------------------------------  ---------------------------------
+high      dast:api  SQL Injection                                                 POST /users/v1/login
+high      dast:api  SQL Injection                                                 PUT /users/v1/{username}/password
+medium    dast:api  Buffer Overflow                                               PUT /users/v1/{username}/password
+medium    dast:api  Format String Error                                           PUT /users/v1/{username}/password
+low       dast:api  Insufficient Site Isolation Against Spectre Vulnerability     PUT /users/v1/{username}/password
+low       dast:api  Server Leaks Version Information via "Server" HTTP Response   PUT /users/v1/{username}/password
+low       dast:api  Unexpected Content-Type was returned                          PUT /users/v1/{username}/password
+low       dast:api  ZAP is Out of Date                                            GET /me
+low       dast:web  Insufficient Site Isolation Against Spectre Vulnerability     GET /vendor/moment.min.js
+low       dast:web  Insufficient Site Isolation Against Spectre Vulnerability     GET /vendor/lodash.min.js
+low       dast:web  Insufficient Site Isolation Against Spectre Vulnerability     GET /vendor/jquery.min.js
+low       dast:web  ZAP is Out of Date                                            GET /vendor/moment.min.js
+info      dast:api  Non-Storable Content                                          PUT /users/v1/{username}/password
+info      dast:web  Storable and Cacheable Content                                GET /vendor/jquery.min.js
+info      dast:web  Storable and Cacheable Content                                GET /vendor/moment.min.js
+
+
+== Offline run with a stale Trivy cache (#70) against the online run (#69)
+== Changes between runs
+#69 -> #70: 3 new, 243 recurring, 6 resolved
+tool      new  recurring  resolved
+--------  ---  ---------  --------
+gitleaks    0          1         0
+grype       0         18         0
+semgrep     0         16         0
+trivy       0        118         0
+zap         3         90         6
+
+New (most severe first):
+severity  scan      finding                                                       location
+--------  --------  ------------------------------------------------------------  ---------------------------------
+low       dast:api  Server Leaks Version Information via "Server" HTTP Response   PUT /users/v1/{username}/password
+low       dast:api  ZAP is Out of Date                                            POST /users/v1/login
+info      dast:api  Non-Storable Content                                          PUT /users/v1/{username}/password
+
+Resolved (most severe first):
+severity  scan      finding                                                       location
+--------  --------  ------------------------------------------------------------  --------------------------
+low       dast:api  Server Leaks Version Information via "Server" HTTP Response   POST /users/v1/register
+low       dast:api  ZAP is Out of Date                                            GET /books/v1/{book_title}
+low       dast:web  Insufficient Site Isolation Against Spectre Vulnerability     GET /app.js
+info      dast:api  Non-Storable Content                                          POST /users/v1/register
+info      dast:web  Modern Web Application                                        GET /robots.txt
+info      dast:web  Storable and Cacheable Content                                GET /vendor/lodash.min.js
+

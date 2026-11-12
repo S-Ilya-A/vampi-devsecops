@@ -8,22 +8,25 @@ This repository is a fork of VAmPI. It has a Postgres back end, a deliberately v
 - **Staging.** A Vagrant VM receives an SSH deploy and is scanned by ZAP twice: a passive baseline of the web client and an authenticated active scan of the API.
 - **Telemetry.** An OpenSearch stack receives scanner findings, CI job events and the VM's application logs. A tested Python CLI reports trends from it, and a dashboard shows the same data.
 
-Five sets of findings are fixed, and the trend report shows them resolved between pipelines #30 and #31. The pipeline is still red, honestly: the cross-site scripting in the web client, the hard-coded `SECRET_KEY`, `debug=True`, old Flask and PyJWT, base-image packages and the leaked AWS key in history are not fixed (§9).
+Six sets of findings are fixed, and the trend report shows them resolved (pipelines #30 to #31, and #68 to #69). A final review from a cold start found and fixed ten more defects in the pipeline and the scripts themselves (§7, "Final review"). The pipeline is still red, honestly: the cross-site scripting in the web client, the hard-coded `SECRET_KEY`, `debug=True`, old Flask and PyJWT, base-image packages and the leaked AWS key in history are not fixed (§9).
 
 ## 2. How to run it
 
 Prerequisites:
-- 16 GB RAM, Docker Desktop with about 10 GB for its VM, VirtualBox 7 and Vagrant 2.4, Git Bash on Windows (or bash on Linux or macOS).
+- 16 GB RAM, Docker Desktop with about 10 GB for its VM, VirtualBox 7 and Vagrant 2.4, bash with git, curl, openssl, ssh and python3.
 - One hosts-file line: `127.0.0.1 gitlab.northwind.test`. The preflight check prints the exact command.
+- **Tested on Windows 11 with Docker Desktop (WSL 2) and Git Bash only.** The scripts are plain bash and avoid Windows-only tools, so macOS with Docker Desktop should behave the same, but that was not tested. Linux with the native Docker Engine will not work as is (§9).
 
 ```bash
 scripts/gitlab-up.sh        # GitLab CE, registry, Docker Hub mirror, runner, project, first pipeline
                             # first run 10-15 min (GitLab boot ~5 min); re-run: ~1 min
 scripts/telemetry-up.sh     # OpenSearch + Dashboards, CA, users, templates, dashboard, CI variables (~3 min)
 scripts/staging-up.sh       # VM, deploy key, pinned host key, Fluent Bit credentials (first run ~10 min)
-scripts/gitlab-up.sh        # again, so the next pipeline has every CI variable; waits for the pipeline (~30 min)
+scripts/gitlab-up.sh --run  # start a new pipeline now that every CI variable exists, and wait for it (~15 min)
 scripts/trend --since 7d    # trend report as the read-only analyst
 ```
+
+The first pipeline has no deploy, DAST or telemetry jobs, because their CI variables do not exist yet; `--run` starts the full one. Both runs end with `pipeline finished with status: failed`. That is the expected result: the gates fail on the findings that are not fixed (§9).
 
 Steady-state memory use:
 - GitLab, about 4 GB;
@@ -31,7 +34,7 @@ Steady-state memory use:
 - the VM, 1.5 GB and one vCPU;
 - during a pipeline, up to two jobs at once (dind builds, ZAP at about 1 GB).
 
-A full pipeline takes 25–30 minutes. Most of that is the bounded ZAP active scan (up to 12 minutes) and the image scans.
+A full pipeline takes about 15 minutes (#32: 13.4 minutes). Before the ReDoS fix it took 25–30 minutes, because the active scan hung the API and ran into its 12-minute limit.
 
 After the first image pulls, pipelines, deploys and the telemetry work offline (§4, "Offline"). The one exception is creating the staging VM from scratch (§9). Tear-down: `scripts/gitlab-down.sh [--purge]`, `scripts/telemetry-up.sh --down|--purge` and `scripts/staging-up.sh --destroy`.
 
@@ -94,12 +97,12 @@ Stages: `test` (gates, unit tests, telemetry tests) → `build` → `scan` → `
 | DAST API | ZAP 2.16.1 API scan, authenticated, active | every operation in the deployed OpenAPI definition | any High; **or no response from `/users/v1` and `/books/v1`** | active Mediums need human confirmation; High is injection | `zap-api.json/.html` |
 
 **False positives** are suppressed narrowly, next to the configuration, each with an S-number, a reason and an expiry, and listed in `docs/SECURITY_GATES.md`:
-- **S-01:** the example JWT in the OpenAPI spec. Gitleaks allowlists the exact value, and Semgrep has a `nosemgrep` with the rule id.
-- **S-02:** ZAP's false SQL injection on `PUT /users/v1/{username}/password`. It is suppressed for that URL only, until 2027-02-09.
+- **S-01:** the example JWT in the OpenAPI spec. Gitleaks allowlists the exact value, Semgrep has a `nosemgrep` with the rule id, and Trivy ignores that rule at that one path in the API image.
+- **S-02 (retired):** ZAP's false SQL injection on `PUT /users/v1/{username}/password`, suppressed for that URL only. It turned out to be a symptom of PT-03 and stopped appearing once that was fixed, so the suppression was deleted (§7).
 
 Disabling a rule, or ignoring a path to make a finding go away, is not allowed.
 
-**Fail closed, not open.** Three gates once passed on scans that had tested nothing; each now fails instead:
+**Fail closed, not open.** Three gates could pass without having really tested the code; each now fails instead:
 
 | Problem | What happened | Fix |
 |---|---|---|
@@ -107,7 +110,7 @@ Disabling a rule, or ignoring a path to make a finding go away, is not allowed.
 | Semgrep skipped whole files on timeouts | `frontend/public/app.js` in #27 and `app.py` in #29: their findings vanished silently | `--timeout-threshold 0`, plus a COVERAGE failure |
 | Grype read an eight-month-old DB | Grype 0.86 accepted it without complaint | Grype 0.99.1, which enforces the 30-day age limit |
 
-**Offline.** The scanners' rule sets and databases live in the CI cache. The cache uses one named volume shared by the runner slots, and it is saved even from failing jobs. Every job tries to refresh and falls back to the cache. This was tested with a pipeline whose update sources were all unreachable (#23 against #22): the verdicts were identical. In that test Trivy's databases were still fresh, so only the Semgrep and Grype fallbacks were actually exercised.
+**Offline.** The scanners' rule sets and databases live in the CI cache. The cache uses one named volume shared by the runner slots, and it is saved even from failing jobs. Every job tries to refresh and falls back to the cache. This is tested with a pipeline whose update sources are all unreachable. The first such test (#23 against #22) gave identical verdicts, but Trivy's databases were still fresh then, so Trivy never tried to download. Repeated with a two-day-old cache (#33), the Trivy fallback failed: Trivy deletes its database metadata before downloading, and after a failed download refused the cached database. That is fixed (the metadata is kept and put back). The final test, #70 against the online #69 with the cached Trivy metadata aged by hand, exercised all three fallbacks: Semgrep, Grype and Trivy each logged the failed refresh, used the cached copy and reported the same findings (16, 18 and 118).
 
 ## 5. Staging and DAST
 
@@ -154,10 +157,10 @@ Getting there took four fixes, each of which would otherwise have left a scan th
 | PT-13 | Werkzeug debug server | partly | only as "Server leaks version information" |
 | PT-11 | ReDoS on e-mail update | **triggered, not reported** | the active scan sent such an address and hung the API at 91 % CPU until restarted; no alert. Seen only as the API going silent. |
 | PT-02 | `_debug` lists every user's password | missed | reached (200), but no rule judges response content |
-| PT-03 | change anyone's password | missed | ZAP did change `name1`'s password mid-scan and then raised a false SQLi (S-02); the application logs show it (502 successful password changes in one run) |
+| PT-03 | change anyone's password | missed, **now fixed** | ZAP's own requests changed `name1`'s password, which is this flaw, and no rule recognised it. What ZAP reported instead were two false SQL injections: one at that URL (S-02) and, in some runs, one on the login. The application logs did show it: 502 successful password changes in one run. |
 | PT-04, PT-05 | mass assignment, BOLA | missed | authorisation logic needs two users and business context |
 | PT-06 | guessable JWT key | missed | no ZAP rule brute-forces HMAC keys |
-| PT-07 | stored and DOM XSS | missed | the API returns JSON; the passive baseline does not execute the client with the seeded data |
+| PT-07 | stored and DOM XSS | missed | the API returns JSON, so the API scan sees no markup; the baseline crawls the web client without logging in, so the seeded title is never rendered, and its passive rules do not detect DOM XSS anyway. Semgrep catches the sinks instead (6 ERRORs). |
 | PT-08 | unauthenticated `/createdb` | excluded | the deploy job calls it without credentials, which is the proof |
 | PT-09, PT-10, PT-12, PT-15 | user enumeration, no rate limit, plain-text passwords, token in localStorage | missed | PT-10 is visible in the logs (537 failed logins in one run); PT-15 is caught by Semgrep instead (WARNING) |
 
@@ -179,7 +182,7 @@ Full description: `docs/TELEMETRY.md`. Dashboard screenshot: `docs/dashboard.png
 Index templates pin keyword fields. Retention is 30 days for logs and 180 days for pipeline data (ISM). Monthly indices for pipeline data are enough at this volume; daily indices for logs make retention a cheap delete.
 
 **How each stream gets in:**
-1. **Findings.** The `telemetry-report` job runs last, even when gates failed. It pulls every scanner's artefacts and normalises them into one shape: tool, scan, rule, severity, location, package and versions, fix available, CVE or CWE, suppression. Fingerprints are stable across runs: they ignore line numbers, image tags, the DAST user and ZAP's payloads. ZAP URLs fold into the OpenAPI path template they match; without that, one API scan was 4,165 "findings" instead of 71. A scan with no report, or with a Semgrep timeout, is recorded as `missing` or `incomplete`, never as zero findings. Secret values are dropped.
+1. **Findings.** The `telemetry-report` job runs last, even when gates failed. It pulls every scanner's artefacts and normalises them into one shape: tool, scan, rule, severity, location, package and versions, fix available, CVE or CWE, suppression. Fingerprints are stable across runs: they ignore line numbers, image tags, the DAST user and ZAP's payloads. ZAP URLs fold into the OpenAPI path template they match; without that, one API scan was 4,165 "findings" instead of about ten. Low and informational ZAP alerts are one finding per alert, because ZAP reports only a changing sample of URLs for them. A scan with no report, or with a Semgrep timeout, is recorded as `missing` or `incomplete`, never as zero findings. Secret values are dropped.
 2. **Job events.** The same job reads this pipeline's jobs, retried attempts included, from the GitLab API with a `read_api` project token. It records name, stage, commit, ref, status, duration, queue time, failure reason and runner. Document ids are fixed, so a re-run overwrites instead of duplicating.
 3. **Application logs.** Docker's fluentd driver on the VM sends to Fluent Bit. Fluent Bit strips ANSI colours (Werkzeug colours its lines, which defeated the parser), parses nginx and Werkzeug access lines, and ships them over verified TLS. A filesystem buffer covers OpenSearch outages; logs buffered before the stack existed arrived once it came up.
 
@@ -196,13 +199,13 @@ The roles were checked: every out-of-scope request gets 403, and an anonymous on
 - new, recurring and resolved findings between two runs, leaving out scans that are missing from either run;
 - application-log signals: failed logins per client, 5xx paths, 401/403 paths, injection-looking requests (and how many got a 2xx answer), calls to the debug endpoint, `/createdb`, password changes and user deletions, scanner user agents, and services that went silent.
 
-There are 39 unit tests, standard library only, run in the `telemetry-tests` job.
+There are 40 unit tests, standard library only, run in the `telemetry-tests` job.
 
 ![dashboard](docs/dashboard.png)
 
 ## 7. Fixes
 
-All five sets were fixed in commit `f4afcfb`, pipeline #31, against #30. The full trend output is in `docs/trend-30-to-31.txt`.
+The first five sets were fixed in commit `f4afcfb`, pipeline #31, against #30. The full trend output is in `docs/trend-30-to-31.txt`. The sixth, PT-03, is described after them.
 
 | Finding | Gates that reported it | Fix |
 |---|---|---|
@@ -244,14 +247,49 @@ low     dast:web             Server Leaks Version Information, X-Content-Type-Op
 image:frontend: 1014 resolved
 ```
 
-Both DAST gates went green in #31. The API scan covered 5,700 URLs and the coverage check passed; the only High left is the S-02 false positive.
+The web client was also checked in a browser after the change (headless Chrome, against `docker compose up --build`): login, the book list and adding a book work with jQuery 3.7.1, lodash 4.17.21, moment 2.30.1 and the strict CSP. A book titled `<img src=x onerror=alert(1)>` is still inserted as markup, because PT-07 is not fixed, but the browser refuses to run its handler: "Executing inline event handler violates the following Content Security Policy directive".
+
+Both DAST gates went green in #31. The API scan covered 5,700 URLs and the coverage check passed; the only High left at that point was the S-02 false positive.
 
 What the "new" column means. It is not regressions, and it is not hidden:
-- **Trivy, 57 new.** The new base image is Alpine 3.24.2, which carries curl, expat, musl, zlib and brotli fixes that are newer than the image. They still block the image gate. The fix is the next upstream image, or `apk upgrade`, but the build containers here cannot reach the Alpine CDN reliably.
+- **Trivy, 57 new.** The new base image is built on Alpine 3.24.2. Fixes for its curl, expat, musl, zlib and brotli packages were released after the image was. Ten of these findings are High or Critical with a fix, so they still block the image gate. The fix is the next upstream image, or `apk upgrade`, but the build containers here cannot reach the Alpine CDN reliably.
 - **Grype, 3 new.** Two lodash advisories, GHSA-r5fr-rjxr-66jc and GHSA-xxjr-mmjv-4gpg, also affect 4.17.21; they need a later release, so the bump did not fix them. They appear as resolved for 4.17.15 and new for 4.17.21 because the version is part of the fingerprint. The third is a moment 2.30.1 advisory (GHSA-4p3w-j4w9-5jqw). The lodash bump fixed three of its five advisories, not all of them.
 - **ZAP, 25 new.** Rules that never finished before. While the ReDoS hung the API, the active scan ran into its time limit. With the API answering, rules such as Buffer Overflow and Format String (Medium) now complete.
 
 One more caveat about reading the table: #29's Semgrep count of 18 was an incomplete scan, shipped before the `incomplete` status existed.
+
+### The sixth fix: PT-03, found through an unstable gate
+
+The DAST API gate was green in #31 and #32, then red in #68 with "SQL Injection, `POST /users/v1/login`". The code had not changed there, and the login query is not injectable. The cause was PT-03: any logged-in user could change anyone's password, so ZAP's own requests to `PUT /users/v1/name1/password` changed that user's password, the login example in the API definition stopped working, and ZAP read the changed answer as a true/false condition.
+
+The fix is in the application (commit `9924943`): the handler answers 403 unless the caller is that user or an admin, with a regression test. In #69:
+
+```
+#68 -> #69: 8 new, 241 recurring, 15 resolved
+high    dast:api  SQL Injection   POST /users/v1/login
+high    dast:api  SQL Injection   PUT /users/v1/{username}/password
+```
+
+ZAP's SQL Injection rule now passes on every endpoint, so the S-02 suppression matched nothing and was deleted. Both false positives had been symptoms of a real flaw that no ZAP rule detects.
+
+### Final review
+
+Before submitting I shut everything down, rebooted, and went through the stand again from a cold start, including a clone of the bundle inside a Linux container and an offline pipeline with a stale cache. That found ten defects, all fixed:
+
+| Found | Effect | Fix |
+|---|---|---|
+| Scripts committed without the executable bit (from Windows) | `scripts/gitlab-up.sh` would fail with "Permission denied" on Linux or macOS | mode 100755 in git; checked in a clone of the bundle on Linux |
+| The documented second `gitlab-up.sh` run re-reported the commit's first pipeline | a reviewer following §2 would never see deploy, DAST or telemetry jobs | `gitlab-up.sh --run` |
+| The bento box ships SSH host keys made at box build time | every VM from it shared one host private key, so pinning proved nothing | provisioning generates the VM's own keys once |
+| The API image contained the whole repository | CI configuration, the staging and telemetry set-up; locally also `staging/.vagrant` with the VM's private key (found by Trivy) | allow-list `.dockerignore` |
+| The image gate scanned secrets under `--severity HIGH,CRITICAL` | "any secret" was documented, but Trivy rates a JWT Medium | a separate secret gate with no severity filter; S-01 for Trivy |
+| Trivy's offline fallback broke once the cache was stale (#33) | scans failed with "cannot be specified on the first run", and the damaged cache was saved | keep and restore the database metadata |
+| `deploy-staging` checked the web client with one immediate request | "connection refused" under load | wait loop, as for the API |
+| VirtualBox silently skipped a port forward Windows had reserved (#33, #34) | the VM came up without its web port; Vagrant reported success | `staging-up.sh` checks the forwarded ports and explains the cause |
+| `telemetry-report` started before a running image scan had finished (#34) | that scan was recorded as missing | no `needs`: the job waits for every earlier stage |
+| Low and informational ZAP findings flapped between identical runs | a dozen false "new" and "resolved" per comparison | one finding per alert below Medium |
+
+A full pipeline on the final commit takes about 15 minutes. The gates that still fail do so on the findings listed in §9.
 
 ## 8. Design decisions
 
@@ -262,7 +300,7 @@ One more caveat about reading the table: #29's Semgrep count of 18 was an incomp
 | Runner to VM | VirtualBox NAT port forwards on loopback, reached through host-gateway | host-only network; bridged | exposes nothing beyond the laptop and needs no Docker-to-VirtualBox route, which differs per OS |
 | VM CPUs | 1 vCPU | 2 vCPUs | the 2-vCPU guest stalled for good under Hyper-V (NEM) |
 | Deploy credentials | protected file variables: an SSH key and a pinned known_hosts; registry login with the job token, then logout | password; `StrictHostKeyChecking=no`; a long-lived registry token on the VM | nothing reusable is left on the VM; the job refuses to talk to an impostor |
-| SAST rules | registry rulesets plus small project rules | registry only; CodeQL | the registry rules missed every pen-test SQLi and XSS; CodeQL is not open source for private use |
+| SAST rules | registry rulesets plus small project rules | registry only; CodeQL | the registry rules missed every pen-test SQLi and XSS; CodeQL's licence does not cover private code without a paid plan |
 | SCA and image thresholds | High/Critical **with a fix** | any High; CVSS ≥ 7 | blocking on unfixed CVEs blocks everyone on what nobody can change |
 | DAST | baseline (Medium) plus authenticated active API scan (High), with a coverage check | baseline only; full scan of the web client | the pen test found almost nothing with an unauthenticated crawl |
 | Telemetry security | own CA, TLS verified everywhere, one account per writer | security plugin disabled on loopback; the demo certificates | the demo key is public and its users have known passwords; with the plugin off, any container could rewrite the history the trend relies on |
@@ -277,19 +315,21 @@ One more caveat about reading the table: #29's Semgrep count of 18 was an incomp
   - XSS in the web client (PT-07, 6 Semgrep ERRORs);
   - hard-coded `SECRET_KEY` and the guessable JWT key (PT-06), `debug=True` (PT-13);
   - Flask 2.2.2 and PyJWT 2.6.0 (Trivy and Grype High/Critical); PyJWT needs code changes;
-  - the authorisation flaws PT-02 to PT-05, PT-09, PT-10 and PT-12.
+  - the authorisation flaws PT-02, PT-04 and PT-05;
+  - user enumeration, the missing rate limit and plain-text passwords (PT-09, PT-10, PT-12).
 
-  Each is a code change in the application, not pipeline work, and five sets were enough to show the loop. The leaked AWS key in history (Gitleaks) needs rotation, not a code change: it is synthetic here, so I left it as the standing example of a history finding.
-- **No authorisation tests in DAST.** ZAP cannot find BOLA. The fix is a scripted two-user test, in the pipeline, that asserts 403s. It would turn PT-03 and PT-05 into gate failures.
+  Each is a code change in the application, not pipeline work, and six sets were enough to show the loop. The leaked AWS key in history (Gitleaks) needs rotation, not a code change: it is synthetic here, so I left it as the standing example of a history finding.
+- **No authorisation tests in DAST.** ZAP cannot find BOLA. The fix is a scripted two-user test, in the pipeline, that asserts 403s. It would turn PT-05, and any regression of PT-03, into gate failures.
 - **No structured security events in the application.** The application logs only access lines and tracebacks. Behind VirtualBox NAT every client is `10.0.2.2`, so per-client signals are degenerate. Forwarding `X-Forwarded-For` and logging login, password-change and admin events as JSON (the Fluent Bit parser for that is already in place) would make the log analysis far sharper.
 - **No alerting.** Nothing pages anyone when logs go silent or failed logins spike. The trend report shows both, but only when someone runs it. OpenSearch Alerting is installed and unused.
 - **No real-time detection of hung services.** The ReDoS hang showed only as silence; a health-check probe with a log line would catch it.
+- **Linux with the native Docker Engine is not supported.** The design relies on Docker Desktop: there, a job container reaches a port published on the host's loopback through `host-gateway`. On a native Linux engine `host-gateway` is the bridge address, and loopback-only ports are not reachable from containers. The ports would have to listen on the bridge address for the jobs and on loopback for the VM (VirtualBox NAT's `10.0.2.2` is the host's loopback). `GITLAB_BIND` exists for GitLab, but the telemetry and VM ports are fixed to `127.0.0.1`, and none of this was tested.
 - **Creating the VM from scratch needs the network.** Deploys and re-provisioning work offline, but a VM rebuilt with `--destroy` installs Docker Engine and Debian packages from the internet. An apt cache (apt-cacher-ng on the host) or a pre-built box would close this gap.
 - **Unpinned packages in provisioning.** Docker CE and the compose plugin are installed at whatever version download.docker.com serves.
 - **Unsigned baseline tag.** The `baseline` tag is not signed (no GPG key available); commits are not signed either.
 - **No stretch goals.** No Cosign signing, no OPA/Conftest, no MobSF.
 - **Telemetry TLS is verified, but Dashboards is plain HTTP on loopback**, with a non-Secure cookie.
-- **Thin offline test.** The offline fallback was tested once, and only while Trivy's databases were fresh.
+- **The stand depends on Windows not reserving its ports.** On the development laptop the dynamic port range starts at 1024, so after a reboot Hyper-V can reserve any port the stand uses. `staging-up.sh` detects a VM port that was not forwarded and Docker fails loudly, but nothing moves the ports automatically (docs/STAGING.md).
 
 ## 10. Scaling question
 
@@ -311,7 +351,7 @@ I would change four things:
 
 ## 11. Time log
 
-Approximate, reconstructed from commit times. Pipeline runs (25–30 minutes each) account for much of the "actual" time, spent waiting rather than working.
+Approximate, reconstructed from commit times. Pipeline runs (25–30 minutes each at the time) account for much of the "actual" time, spent waiting rather than working.
 
 | Task | Planned | Actual | Notes |
 |---|---|---|---|
@@ -320,3 +360,4 @@ Approximate, reconstructed from commit times. Pipeline runs (25–30 minutes eac
 | 3. VM and DAST | 2–2.5 h | ~3.5 h | the ZAP API scan that tested nothing (four fixes); VM stalls under Hyper-V |
 | 4. Telemetry | 2–3 h | ~3 h | OpenSearch security configuration (Dashboards server user, strict X.509 for Python 3.13+); ZAP URL folding; Semgrep timeouts found through the trend data |
 | 5–6. Fixes and note | 1–1.5 h | ~1.5 h | ReDoS found because the scan hung staging |
+| Final review | not planned | ~4 h | cold start after a reboot, bundle clone on Linux, offline run with a stale cache; ten defects and PT-03 (§7) |
