@@ -87,3 +87,18 @@ def test_email_check_does_not_backtrack(client):
     assert r.status_code == 400
     r = client.put("/users/v1/name1/email", json={"email": "name1.new@mail.example.org"}, headers=headers)
     assert r.status_code == 204
+
+
+def test_password_change_is_limited_to_the_owner_or_an_admin(client):
+    # PT-03: name1 used to be able to change name2's password.
+    headers = {"Authorization": "Bearer " + login(client, "name1", "pass1")["auth_token"]}
+    r = client.put("/users/v1/name2/password", json={"password": "hijacked"}, headers=headers)
+    assert r.status_code == 403
+    assert login(client, "name2", "pass2")["status"] == "success"      # unchanged
+
+    r = client.put("/users/v1/name1/password", json={"password": "pass1"}, headers=headers)
+    assert r.status_code == 204                                         # own password
+
+    admin = {"Authorization": "Bearer " + login(client, "admin", "pass1")["auth_token"]}
+    r = client.put("/users/v1/name2/password", json={"password": "pass2"}, headers=admin)
+    assert r.status_code == 204                                         # an admin may

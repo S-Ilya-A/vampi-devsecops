@@ -188,7 +188,17 @@ def update_password(username):
         return Response(error_message_helper(resp), 401, mimetype="application/json")
     else:
         if request_data.get('password'):
-            if vuln:  # Unauthorized update of password of another user
+            if vuln:
+                # Was PT-03: any logged-in user could change anyone's password,
+                # because the user was taken from the URL and never compared with
+                # the token. Only the account's owner or an admin may do it now.
+                # (It also made the DAST gate unstable: ZAP's own requests changed
+                # name1's password mid-scan, the documented login stopped working,
+                # and ZAP reported the difference as SQL injection on the login.)
+                caller = User.query.filter_by(username=resp['sub']).first()
+                if username != resp['sub'] and not (caller and caller.admin):
+                    return Response(error_message_helper("You may only change your own password."), 403,
+                                    mimetype="application/json")
                 user = User.query.filter_by(username=username).first()
                 if user:
                     user.password = request_data.get('password')
