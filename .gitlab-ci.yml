@@ -271,8 +271,25 @@ sca-grype:
     paths: [.trivycache/db/, .trivycache/java-db/]
   script:
     - mkdir -p reports
-    - 'trivy image --download-db-only || echo "WARN - could not refresh the vulnerability DB, using the cached copy"'
-    - 'trivy image --download-java-db-only --skip-java-db-update=false || echo "WARN - could not refresh the Java DB, using the cached copy"'
+    # Refresh a database, falling back to the cached copy. Trivy deletes the
+    # database's metadata.json before it downloads; when the download fails the
+    # cached database is left without it, and --skip-db-update then refuses to
+    # run ("cannot be specified on the first run"). An offline pipeline with a
+    # stale cache hit exactly that (#33), so the metadata is kept and put back.
+    # With no cached copy at all the scan below still fails: nothing is scanned
+    # with no database.
+    - |
+      refresh_db() {  # refresh_db <label> <cache subdirectory> <trivy image arguments>
+        label="$1"; meta="$TRIVY_CACHE_DIR/$2/metadata.json"; shift 2
+        cp "$meta" "$meta.keep" 2>/dev/null || true
+        if trivy image "$@"; then rm -f "$meta.keep"; return 0; fi
+        if [ ! -s "$meta" ] && [ -s "$meta.keep" ]; then mv "$meta.keep" "$meta"; fi
+        rm -f "$meta.keep"
+        if [ -s "$meta" ]; then echo "WARN - could not refresh the $label, using the cached copy"
+        else echo "WARN - could not refresh the $label and there is no cached copy"; fi
+      }
+    - refresh_db "vulnerability DB" db --download-db-only
+    - refresh_db "Java DB" java-db --download-java-db-only --skip-java-db-update=false
     # Full reports: every severity, all packages (the image SBOM comes from this).
     - >-
       trivy image --skip-db-update --scanners vuln,secret --image-config-scanners secret
@@ -353,10 +370,15 @@ deploy-staging:
       docker compose --env-file .env --env-file release.env up -d --remove-orphans --wait --wait-timeout 180;
       rc=\$?; docker logout '$CI_REGISTRY' >/dev/null; exit \$rc"
     - API="http://$STAGING_HOST:$STAGING_API_PORT"
+    - WEB="http://$STAGING_HOST:$STAGING_WEB_PORT"
+    # "up --wait" returns when the containers run, which is before the servers
+    # in them listen. Wait for both; a single request right away once failed
+    # with "connection refused" on the web client under load (#33).
     - for i in $(seq 1 30); do wget -qO- "$API/" >/dev/null && break; sleep 2; done
+    - for i in $(seq 1 30); do wget -qO /dev/null "$WEB/" && break; sleep 2; done
     # Staging data is disposable: re-seed the demo users and books on every deploy.
     - wget -qO- "$API/createdb"
-    - wget -qO /dev/null "http://$STAGING_HOST:$STAGING_WEB_PORT/"
+    - wget -qO /dev/null "$WEB/"
     - remote "cd /opt/vampi && docker compose --env-file .env --env-file release.env ps --format '{{.Service}} {{.Image}} {{.Status}}'"
 
 # --- DAST: OWASP ZAP against staging -----------------------------------------
