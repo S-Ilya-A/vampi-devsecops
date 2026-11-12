@@ -242,6 +242,9 @@ sca-grype:
 .image-scan:
   extends: .security-report
   stage: scan
+  # The download is bounded (5 min) and a scan takes a few minutes; fail well
+  # before the runner's 1 h default.
+  timeout: 30m
   image:
     name: aquasec/trivy:0.57.1
     entrypoint: [""]
@@ -257,18 +260,18 @@ sca-grype:
     TRIVY_IGNOREFILE: .trivyignore.yaml
     # Misconfiguration checks embedded in the pinned Trivy release: deterministic and offline.
     TRIVY_SKIP_CHECK_UPDATE: "true"
-    # An image can contain jars Trivy wants its Java DB for (the earlier
-    # nginx:1.21 base did: gettext's libintl). The DB is refreshed in its own
-    # step below (with the same cached fallback) and the scans themselves never
-    # try to download it.
-    TRIVY_JAVA_DB_REPOSITORY: mirror.gcr.io/aquasec/trivy-java-db:1
+    # No Java DB. It is only used for Java archives, and neither image has any
+    # (the earlier nginx:1.21 base did). It is 952 MB: when the cached copy
+    # went stale, both scans downloaded it at once over a slow link and one ran
+    # into the 1 h job timeout (#71). A gate below fails if a Java archive
+    # appears, so it cannot go unscanned silently.
     TRIVY_SKIP_JAVA_DB_UPDATE: "true"
   cache:
     key: trivy-db
     # A failing gate must still save its data, or the next offline run has none.
     when: always
-    # Only the databases: the layer cache (fanal/) is large and per-image.
-    paths: [.trivycache/db/, .trivycache/java-db/]
+    # Only the database: the layer cache (fanal/) is large and per-image.
+    paths: [.trivycache/db/]
   script:
     - mkdir -p reports
     # Refresh a database, falling back to the cached copy. Trivy deletes the
@@ -278,18 +281,19 @@ sca-grype:
     # stale cache hit exactly that (#33), so the metadata is kept and put back.
     # With no cached copy at all the scan below still fails: nothing is scanned
     # with no database.
+    # A download that is too slow is treated like one that fails: an
+    # unreachable source fails at once, but a slow one has no limit of its own.
     - |
-      refresh_db() {  # refresh_db <label> <cache subdirectory> <trivy image arguments>
-        label="$1"; meta="$TRIVY_CACHE_DIR/$2/metadata.json"; shift 2
+      refresh_db() {  # refresh_db <label> <cache subdirectory> <seconds> <trivy image arguments>
+        label="$1"; meta="$TRIVY_CACHE_DIR/$2/metadata.json"; limit="$3"; shift 3
         cp "$meta" "$meta.keep" 2>/dev/null || true
-        if trivy image "$@"; then rm -f "$meta.keep"; return 0; fi
+        if timeout "$limit" trivy image "$@"; then rm -f "$meta.keep"; return 0; fi
         if [ ! -s "$meta" ] && [ -s "$meta.keep" ]; then mv "$meta.keep" "$meta"; fi
         rm -f "$meta.keep"
         if [ -s "$meta" ]; then echo "WARN - could not refresh the $label, using the cached copy"
         else echo "WARN - could not refresh the $label and there is no cached copy"; fi
       }
-    - refresh_db "vulnerability DB" db --download-db-only
-    - refresh_db "Java DB" java-db --download-java-db-only --skip-java-db-update=false
+    - refresh_db "vulnerability DB" db 300 --download-db-only
     # Full reports: every severity, all packages (the image SBOM comes from this).
     - >-
       trivy image --skip-db-update --scanners vuln,secret --image-config-scanners secret
@@ -307,6 +311,10 @@ sca-grype:
       trivy image --skip-db-update --scanners secret --image-config-scanners secret
       --exit-code 1 "$IMAGE:$CI_COMMIT_SHORT_SHA" || rc=1
     - trivy config --severity HIGH,CRITICAL --exit-code 1 "$DOCKERFILE" || rc=1
+    # Java archives would need the Java DB this job does not keep (see above).
+    - >-
+      if grep -qE '"Type": "(jar|pom|gradle|sbt)"' "reports/trivy-image-$NAME.json"; then
+      echo "ERROR - the image contains Java archives; add the Java DB to this job"; rc=1; fi
     - exit $rc
 
 scan-image-api:

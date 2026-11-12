@@ -8,7 +8,7 @@ This repository is a fork of VAmPI. It has a Postgres back end, a deliberately v
 - **Staging.** A Vagrant VM receives an SSH deploy and is scanned by ZAP twice: a passive baseline of the web client and an authenticated active scan of the API.
 - **Telemetry.** An OpenSearch stack receives scanner findings, CI job events and the VM's application logs. A tested Python CLI reports trends from it, and a dashboard shows the same data.
 
-Six sets of findings are fixed, and the trend report shows them resolved (pipelines #30 to #31, and #68 to #69). A final review from a cold start found and fixed ten more defects in the pipeline and the scripts themselves (§7, "Final review"). The pipeline is still red, honestly: the cross-site scripting in the web client, the hard-coded `SECRET_KEY`, `debug=True`, old Flask and PyJWT, base-image packages and the leaked AWS key in history are not fixed (§9).
+Six sets of findings are fixed, and the trend report shows them resolved (pipelines #30 to #31, and #68 to #69). A final review from a cold start found and fixed eleven more defects in the pipeline and the scripts themselves (§7, "Final review"). The pipeline is still red, honestly: the cross-site scripting in the web client, the hard-coded `SECRET_KEY`, `debug=True`, old Flask and PyJWT, base-image packages and the leaked AWS key in history are not fixed (§9).
 
 ## 2. How to run it
 
@@ -274,7 +274,7 @@ ZAP's SQL Injection rule now passes on every endpoint, so the S-02 suppression m
 
 ### Final review
 
-Before submitting I shut everything down, rebooted, and went through the stand again from a cold start, including a clone of the bundle inside a Linux container and an offline pipeline with a stale cache. That found ten defects, all fixed:
+Before submitting I shut everything down, rebooted, and went through the stand again from a cold start, including a clone of the bundle inside a Linux container and an offline pipeline with a stale cache. That found eleven defects, all fixed (the last one in the final pipeline itself):
 
 | Found | Effect | Fix |
 |---|---|---|
@@ -288,6 +288,7 @@ Before submitting I shut everything down, rebooted, and went through the stand a
 | VirtualBox silently skipped a port forward Windows had reserved (#33, #34) | the VM came up without its web port; Vagrant reported success | `staging-up.sh` checks the forwarded ports and explains the cause |
 | `telemetry-report` started before a running image scan had finished (#34) | that scan was recorded as missing | no `needs`: the job waits for every earlier stage |
 | Low and informational ZAP findings flapped between identical runs | a dozen false "new" and "resolved" per comparison | one finding per alert below Medium |
+| Both image scans downloaded Trivy's 952 MB Java DB once its cached copy went stale (#71) | at about 400 KB/s one scan ran into the 1 h job timeout, although neither image contains Java | no Java DB, and a gate that fails if a Java archive appears; a 5-minute limit on the database download and a 30-minute job timeout |
 
 A full pipeline on the final commit takes about 15 minutes. The gates that still fail do so on the findings listed in §9.
 
@@ -360,4 +361,4 @@ Approximate, reconstructed from commit times. Pipeline runs (25–30 minutes eac
 | 3. VM and DAST | 2–2.5 h | ~3.5 h | the ZAP API scan that tested nothing (four fixes); VM stalls under Hyper-V |
 | 4. Telemetry | 2–3 h | ~3 h | OpenSearch security configuration (Dashboards server user, strict X.509 for Python 3.13+); ZAP URL folding; Semgrep timeouts found through the trend data |
 | 5–6. Fixes and note | 1–1.5 h | ~1.5 h | ReDoS found because the scan hung staging |
-| Final review | not planned | ~4 h | cold start after a reboot, bundle clone on Linux, offline run with a stale cache; ten defects and PT-03 (§7) |
+| Final review | not planned | ~4 h | cold start after a reboot, bundle clone on Linux, offline run with a stale cache; eleven defects and PT-03 (§7) |
