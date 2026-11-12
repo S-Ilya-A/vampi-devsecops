@@ -7,13 +7,5 @@
     "reason": "why this is a false positive",
     "expires": "2027-01-31"
   },
-  "suppressions": [
-    {
-      "id": "S-02",
-      "pluginid": "40018",
-      "uri_regex": "^http://staging\\.northwind\\.test:15000/users/v1/[^/]+/password$",
-      "reason": "Boolean-based SQL injection reported on the {username} path segment of PUT /users/v1/{username}/password. The handler looks the user up with the ORM (User.query.filter_by(username=...)), so no SQL is built from the path; 'name1 AND 1=1 --' returns 400 'User Not Found' and 'name1' returns 204, which ZAP reads as a true/false difference. The real flaw here is PT-03 (any user can change any password), which no ZAP rule detects.",
-      "expires": "2027-02-09"
-    }
-  ]
+  "suppressions": []
 }

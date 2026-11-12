@@ -91,9 +91,24 @@ class Zap(unittest.TestCase):
         self.assertEqual((sqli["severity"], sqli["instances"], sqli["cve"]), ("high", 2, "CWE-89"))
         self.assertIn(("40018", "PUT /users/v1/{username}/password"), by_loc)
         # the DAST user and a payload in the path both fold into the template
-        self.assertEqual(by_loc[("100000", "PUT /users/v1/{username}/email")]["instances"], 2)
+        ep = lambda u: normalize.zap_endpoint(u, templates=self.templates)
+        self.assertEqual(ep("http://h/users/v1/dast1a2b3c4d/email"), "/users/v1/{username}/email")
+        self.assertEqual(ep("http://h/users/v1/%3Cscript%3E/email"), "/users/v1/{username}/email")
         # a payload that replaced a fixed segment matches no template
-        self.assertIn(("100000", "POST {outside-definition}"), by_loc)
+        self.assertEqual(ep("http://h/'/v1/login"), "{outside-definition}")
+
+    def test_low_and_info_alerts_are_one_finding_per_alert(self):
+        # ZAP samples the URLs of such alerts, and the sample differs between
+        # identical runs; per-endpoint findings would flap between new and resolved.
+        data = load("zap-api.json")
+        found = normalize.zap(data, "dast:api", templates=self.templates)
+        info = [f for f in found if f["rule_id"] == "100000"]
+        self.assertEqual([(f["severity"], f["instances"], f["location"]) for f in info], [("info", 3, "3 sampled URL(s)")])
+        before = info[0]["fingerprint"]
+        client_error = [a for a in data["site"][0]["alerts"] if a["pluginid"] == "100000"][0]
+        client_error["instances"] = [{"uri": "http://staging.northwind.test:15000/books/v1/x", "method": "GET"}]
+        after = [f for f in normalize.zap(data, "dast:api", templates=self.templates) if f["rule_id"] == "100000"]
+        self.assertEqual(after[0]["fingerprint"], before)
 
     def test_fixed_path_wins_over_template(self):
         self.assertEqual(normalize.zap_endpoint("http://h/users/v1/login", templates=self.templates), "/users/v1/login")

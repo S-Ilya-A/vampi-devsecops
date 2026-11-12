@@ -20,7 +20,9 @@ the random user name the DAST session registers, ZAP's attack payloads.
             match no template (a payload replaced a fixed segment) are counted
             under "{outside-definition}". Without a definition (the web client),
             the attack payload and DAST user name are replaced by placeholders.
-            One finding per endpoint; its instances are counted.
+            One finding per endpoint for Medium and High alerts; its instances
+            are counted. Low and informational alerts are one finding per alert,
+            because ZAP reports only a changing sample of URLs for them.
 
 Secret values never leave this module: gitleaks' Secret/Match fields are dropped.
 """
@@ -185,9 +187,17 @@ def zap(data, scan, suppressions=(), templates=None):
         for a in site.get("alerts", []):
             if int(a.get("confidence", 1)) == 0:   # marked false positive in ZAP
                 continue
+            # Low and informational alerts are one finding per alert, not per
+            # endpoint: ZAP keeps only a sample of the URLs for them, and the
+            # sample changes from run to run, so per-endpoint findings appeared
+            # and vanished between identical runs.
+            per_endpoint = int(a["riskcode"]) >= 2
             for inst in a.get("instances") or [{}]:
                 method, uri = inst.get("method", ""), inst.get("uri", "")
-                key = (a.get("alertRef") or a["pluginid"], method, zap_endpoint(uri, inst.get("attack", ""), templates))
+                if per_endpoint:
+                    key = (a.get("alertRef") or a["pluginid"], method, zap_endpoint(uri, inst.get("attack", ""), templates))
+                else:
+                    key = (a.get("alertRef") or a["pluginid"], "", "")
                 g = groups.setdefault(key, {"alert": a, "uris": [], "suppressed": []})
                 g["uris"].append(uri)
                 g["suppressed"].append(next(
@@ -198,7 +208,8 @@ def zap(data, scan, suppressions=(), templates=None):
         a = g["alert"]
         f = _finding(
             "zap", scan, a["pluginid"], a.get("name") or a.get("alert"), _ZAP_SEV.get(int(a["riskcode"]), "info"),
-            (ref, method, path), location="%s %s" % (method, path), instances=len(g["uris"]),
+            (ref, method, path), instances=len(g["uris"]),
+            location=("%s %s" % (method, path)) if path else "%d sampled URL(s)" % len(g["uris"]),
             cve=("CWE-%s" % a["cweid"]) if str(a.get("cweid", "")) not in ("", "-1", "0") else "",
             description=re.sub(r"<[^>]+>", "", a.get("desc", "")))
         # Suppressed only when the gate's suppression covers every instance.
