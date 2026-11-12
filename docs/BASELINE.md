@@ -5,7 +5,7 @@ The assignment (`ASSIGNMENT.md`) describes an inherited repository called `parce
 ## Upstream
 
 - [erev0s/VAmPI](https://github.com/erev0s/VAmPI), MIT licence (`LICENSE`). Its full history is kept. The last upstream commit is `f16052d`.
-- VAmPI is a Flask/Connexion REST API covering the OWASP API Top 10. Its vulnerabilities are documented in `README.md`.
+- VAmPI is a Flask/Connexion REST API covering the OWASP API Top 10. Its vulnerabilities are documented in its README, kept as `docs/VAMPI_README.md`.
 
 ## Changes made on top of upstream, before any security work
 

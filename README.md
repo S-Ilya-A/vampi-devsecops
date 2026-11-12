@@ -1,112 +1,124 @@
-> **Fork for a DevSecOps assignment.** This repository is VAmPI with Postgres, a JavaScript
-> web client and a GitLab CI pipeline added. See [`ASSIGNMENT.md`](ASSIGNMENT.md) and
-> [`docs/BASELINE.md`](docs/BASELINE.md). Quick start: `docker compose up --build`, then
-> `curl localhost:5000/createdb` and open http://localhost:8088.
->
-> **The submission starts at [`NOTE.md`](NOTE.md)**: what was built, how to run it, the gates,
-> the staging VM, the telemetry and the fixes. Details are in
-> [`docs/SECURITY_GATES.md`](docs/SECURITY_GATES.md), [`docs/STAGING.md`](docs/STAGING.md) and
-> [`docs/TELEMETRY.md`](docs/TELEMETRY.md).
->
-> The text below is upstream VAmPI's README. Two of the vulnerabilities it lists are fixed in
-> this fork: the SQL injection in the user lookup and the regular-expression denial of service
-> on the e-mail update (NOTE.md §7).
+# VAmPI DevSecOps — учебный стенд безопасной разработки
 
-# VAmPI
-**The Vulnerable API** *(Based on OpenAPI 3)*
-![vampi](https://i.imgur.com/zR0quKf.jpg)
+Это форк [VAmPI](https://github.com/erev0s/VAmPI) — намеренно уязвимого REST API на Flask. К нему добавлены база Postgres, веб-клиент на JavaScript и полный DevSecOps-контур, который целиком работает на одном ноутбуке: GitLab CI, сканеры безопасности, staging-сервер, DAST и телеметрия.
 
-[![Docker Image CI](https://github.com/erev0s/VAmPI/actions/workflows/docker-image.yml/badge.svg)](https://github.com/erev0s/VAmPI/actions/workflows/docker-image.yml) ![Docker Pulls](https://img.shields.io/docker/pulls/erev0s/vampi)
+Репозиторий — решение тестового задания ([ASSIGNMENT.md](ASSIGNMENT.md)). Официальная записка для проверяющих — [NOTE.md](NOTE.md) (на английском). Этот файл — краткое описание на русском.
 
+> **Внимание.** Приложение уязвимо намеренно. Не публикуйте его в сети: все порты стенда слушают только `127.0.0.1`.
 
-VAmPI is a vulnerable API made with Flask and it includes vulnerabilities from the OWASP top 10 vulnerabilities for APIs. It was created as I wanted a vulnerable API to evaluate the efficiency of tools used to detect security issues in APIs. It includes a switch on/off to allow the API to be vulnerable or not while testing. This allows to cover better the cases for false positives/negatives. VAmPI can also be used for learning/teaching purposes. You can find a bit more details about the vulnerabilities in [erev0s.com](https://erev0s.com/blog/vampi-vulnerable-api-security-testing/).
+## Что внутри
 
+| Часть | Что делает | Где лежит |
+|---|---|---|
+| Приложение | API на Flask, Postgres, веб-клиент на nginx | `app.py`, `api_views/`, `models/`, `frontend/` |
+| GitLab CE + Runner | хранит код, собирает образы, запускает пайплайн | `scripts/gitlab-up.sh`, `.gitlab-ci.yml` |
+| Гейты безопасности | Semgrep, Gitleaks, Syft + Grype, Trivy | `.gitlab-ci.yml`, `.semgrep/`, `ci/` |
+| Staging-сервер | ВМ в VirtualBox, куда пайплайн выкладывает приложение | `scripts/staging-up.sh`, `staging/` |
+| DAST | OWASP ZAP сканирует развёрнутое приложение | `ci/dast_session.py`, `ci/zap_gate.py` |
+| Телеметрия | OpenSearch + Dashboards: находки, события пайплайна, логи | `scripts/telemetry-up.sh`, `telemetry/`, `tools/nwtelemetry/` |
+| Отчёт трендов | CLI, который сравнивает прогоны между собой | `scripts/trend` |
 
-#### Features
- - Based on OWASP Top 10 vulnerabilities for APIs.
- - OpenAPI3 specs and Postman Collection included.
- - Global switch on/off to have a vulnerable environment or not.
- - Token-Based Authentication (Adjust lifetime from within app.py)
- - Available Swagger UI to directly interact with the API
+## Как устроен пайплайн
 
-VAmPI's flow of actions is going like this: an unregistered user can see minimal information about the dummy users included in the API. A user can register and then login to be allowed using the token received during login to post a book. For a book posted the data accepted are the title and a secret about that book. Each book is unique for every user and only the owner of the book should be allowed to view the secret.
+```
+test  →  build  →  scan  →  deploy  →  dast  →  report
+```
 
-A quick rundown of the actions included can be seen in the following table:
+| Стадия | Джобы | Что происходит |
+|---|---|---|
+| `test` | `unit-tests`, `frontend-check`, `telemetry-tests`, `sast-semgrep`, `secrets-gitleaks`, `sbom-syft`, `sca-grype` | тесты и гейты по исходному коду |
+| `build` | `build-api`, `build-frontend` | сборка двух образов и отправка в registry GitLab |
+| `scan` | `scan-image-api`, `scan-image-frontend` | Trivy: уязвимости, секреты и ошибки Dockerfile |
+| `deploy` | `deploy-staging` | выкладка образов на ВМ по SSH |
+| `dast` | `dast-zap-baseline`, `dast-zap-api` | пассивный обход клиента и активный скан API |
+| `report` | `telemetry-report` | отправка всех отчётов в OpenSearch и отчёт трендов |
 
-| **Action** |            **Path**           |                     **Details**                    |
-|:----------:|:-----------------------------:|:--------------------------------------------------:|
-|     GET    |           /createdb           | Creates and populates the database with dummy data |
-|     GET    |               /               |                     VAmPI home                     |
-|     GET    |               /me             |           Displays the user that is logged in       |
-|     GET    |           /users/v1           |      Displays all users with basic information     |
-|     GET    |        /users/v1/_debug       |         Displays all details for all users         |
-|    POST    |       /users/v1/register      |                  Register new user                 |
-|    POST    |        /users/v1/login        |                   Login to VAmPI                   |
-|     GET    |      /users/v1/{username}     |              Displays user by username             |
-|   DELETE   |      /users/v1/{username}     |       Deletes user by username (Only Admins)       |
-|     PUT    |   /users/v1/{username}/email  |             Update a single users email            |
-|     PUT    | /users/v1/{username}/password |                Update users password               |
-|     GET    |           /books/v1           |                 Retrieves all books                |
-|    POST    |           /books/v1           |                    Add new book                    |
-|     GET    |        /books/v1/{book}       |      Retrieves book by title along with secret     |
+Гейт — это джоб, который сохраняет полный отчёт сканера и падает, если найдено что-то выше порога. Пороги и их обоснование описаны в [docs/SECURITY_GATES.md](docs/SECURITY_GATES.md).
 
-For more details you can either run VAmPI and visit `http://127.0.0.1:5000/ui/` or use a service like the [swagger editor](https://editor.swagger.io) supplying the OpenAPI specification which can be found in the directory `openapi_specs`.
+**Пайплайн заканчивается статусом `failed`, и это ожидаемо.** Гейты падают на уязвимостях, которые намеренно оставлены неисправленными (список — в [NOTE.md](NOTE.md), §9). Тесты, сборка, деплой и оба DAST-гейта зелёные.
 
+## Требования
 
-#### List of Vulnerabilities
- - SQLi Injection
- - Unauthorized Password Change
- - Broken Object Level Authorization
- - Mass Assignment
- - Excessive Data Exposure through debug endpoint
- - User and Password Enumeration
- - RegexDOS (Denial of Service)
- - Lack of Resources & Rate Limiting
- - JWT authentication bypass via weak signing key
+- 16 ГБ оперативной памяти.
+- Docker Desktop (на его ВМ нужно около 10 ГБ).
+- VirtualBox 7 и Vagrant 2.4.
+- Bash с утилитами `git`, `curl`, `openssl`, `ssh` и `python3`. На Windows подходит Git Bash.
+- Одна строка в файле hosts: `127.0.0.1 gitlab.northwind.test`.
 
+Стенд проверен только на Windows 11 с Docker Desktop (WSL 2) и Git Bash.
 
+## Быстрый старт
 
- ## Run it
-It is a Flask application so in order to run it you can install all requirements and then run the `app.py`.
-To install all requirements simply run `pip3 install -r requirements.txt` and then `python3 app.py`.
+### Только приложение
 
-Or if you prefer you can also run it through docker or docker compose.
+```bash
+docker compose up --build
+curl localhost:5000/createdb      # создать и наполнить базу
+```
 
- #### Run it through Docker
+После этого веб-клиент доступен на http://localhost:8088, а API — на http://localhost:5000.
 
- - Available in [Dockerhub](https://hub.docker.com/r/erev0s/vampi)
-~~~~
-docker run -p 5000:5000 erev0s/vampi:latest
-~~~~
+### Весь стенд
 
-[Note: if you run Docker on newer versions of the MacOS, use `-p 5001:5000` to avoid conflicting with the AirPlay Receiver service. Alternatively, you could disable the AirPlay Receiver service in your System Preferences -> Sharing settings.]
+Команды выполняются из корня репозитория именно в таком порядке:
 
-  #### Run it through Docker Compose
-`docker-compose` contains two instances, one instance with the secure configuration on port 5001 and another with insecure on port 5002:
-~~~~
-docker-compose up -d
-~~~~
+```bash
+scripts/gitlab-up.sh         # GitLab, registry, runner, проект, первый пайплайн
+scripts/telemetry-up.sh      # OpenSearch и Dashboards
+scripts/staging-up.sh        # staging-ВМ
+scripts/gitlab-up.sh --run   # полный пайплайн с деплоем, DAST и телеметрией
+scripts/trend --since 7d     # отчёт трендов
+```
 
-## Available Swagger UI :rocket:
-Visit the path `/ui` where you are running the API and a Swagger UI will be available to help you get started!
-~~~~
-http://127.0.0.1:5000/ui/
-~~~~
+Первый запуск занимает 25–30 минут, повторный — несколько минут. Все скрипты можно запускать повторно: каждый шаг сначала проверяет, сделан ли он уже.
 
-## Customizing token timeout and vulnerable environment or not
-If you would like to alter the timeout of the token created after login or if you want to change the environment **not** to be vulnerable then you can use a few ways depending how you run the application.
+Подробная инструкция, зависимости между частями и разбор неполадок — в [docs/RUNBOOK.ru.md](docs/RUNBOOK.ru.md).
 
- - If you run it like normal with `python3 app.py` then all you have to do is edit the `alive` and `vuln` variables defined in the `app.py` itself. The `alive` variable is measured in seconds, so if you put `100`, then the token expires after 100 seconds. The `vuln` variable is like boolean, if you set it to `1` then the application is vulnerable, and if you set it to `0` the application is not vulnerable.
- - If you run it through Docker, then you must either pass environment variables to the `docker run` command or edit the `Dockerfile` and rebuild. 
-   - Docker run example: `docker run -d -e vulnerable=0 -e tokentimetolive=300 -p 5000:5000 erev0s/vampi:latest`
-     - One nice feature to running it this way is you can startup a 2nd container with `vulnerable=1` on a different port and flip easily between the two.
+## Адреса
 
-   - In the Dockerfile you will find two environment variables being set, the `ENV vulnerable=1` and the `ENV tokentimetolive=60`. Feel free to change it before running the docker build command.
+| Что | Адрес | Вход |
+|---|---|---|
+| GitLab | http://gitlab.northwind.test:8929 | `root`, пароль в `.local/root-password` |
+| Dashboards | http://127.0.0.1:5601 | `analyst`, пароль в `.local/telemetry/analyst-password` |
+| OpenSearch | https://127.0.0.1:9200 | свой CA: `.local/telemetry/certs/ca.pem` |
+| Приложение на staging | http://127.0.0.1:18088 | — |
+| API на staging | http://127.0.0.1:15000 | — |
 
+Все пароли и ключи генерируются скриптами и хранятся в каталоге `.local/`, который не попадает в git.
 
-## Frequently asked questions
- - **There is a database error upon reaching endpoints!**
-   - Make sure to issue a request towards the endpoint `/createdb` in order to populate the database.
+## Что исправлено и что оставлено
 
- [Picture from freepik - www.freepik.com](https://www.freepik.com/vectors/party)
+**Исправлено** (подтверждено сравнением прогонов):
 
+- SQL-инъекция в поиске пользователя (PT-01);
+- смена чужого пароля (PT-03);
+- отказ в обслуживании через регулярное выражение (PT-11);
+- запуск контейнеров от root;
+- устаревший образ nginx и отсутствие защитных HTTP-заголовков;
+- уязвимые версии jQuery, lodash и moment.
+
+**Оставлено** (на этом и падают гейты):
+
+- XSS в веб-клиенте (PT-07);
+- слабый ключ подписи JWT и `debug=True`;
+- устаревшие Flask и PyJWT;
+- уязвимые системные пакеты в базовых образах;
+- синтетический ключ AWS в истории git.
+
+Номера PT-NN — это пункты отчёта о пентесте: [docs/PENTEST_SUMMARY.md](docs/PENTEST_SUMMARY.md).
+
+## Документация
+
+| Документ | О чём | Язык |
+|---|---|---|
+| [NOTE.md](NOTE.md) | записка к сдаче: что сделано, решения, ограничения | английский |
+| [docs/RUNBOOK.ru.md](docs/RUNBOOK.ru.md) | как всё работает, что от чего зависит, как поднимать и чинить | русский |
+| [docs/SECURITY_GATES.md](docs/SECURITY_GATES.md) | гейты, пороги, подавления, работа без сети | английский |
+| [docs/STAGING.md](docs/STAGING.md) | staging-ВМ, деплой, DAST | английский |
+| [docs/TELEMETRY.md](docs/TELEMETRY.md) | телеметрия, права доступа, отчёт трендов | английский |
+| [docs/BASELINE.md](docs/BASELINE.md) | чем форк отличается от исходного VAmPI | английский |
+| [docs/VAMPI_README.md](docs/VAMPI_README.md) | исходный README проекта VAmPI | английский |
+
+## Лицензия
+
+Как и исходный VAmPI — см. [LICENSE](LICENSE).
