@@ -290,7 +290,7 @@ Before submitting I shut everything down, rebooted, and went through the stand a
 | Low and informational ZAP findings flapped between identical runs | a dozen false "new" and "resolved" per comparison | one finding per alert below Medium |
 | Both image scans downloaded Trivy's 952 MB Java DB once its cached copy went stale (#71) | at about 400 KB/s one scan ran into the 1 h job timeout, although neither image contains Java | no Java DB, and a gate that fails if a Java archive appears; a 5-minute limit on the database download and a 30-minute job timeout |
 
-A full pipeline on the final commit takes about 15 minutes. The gates that still fail do so on the findings listed in §9.
+A full pipeline on the final commit (#73) takes about 15 minutes, each image scan about two. Against #71 it is 0 new and 0 resolved findings in every tool (`docs/trend-71-to-73.txt`), so identical code now gives identical trends. The gates that still fail do so on the findings listed in §9.
 
 ## 8. Design decisions
 

@@ -1,0 +1,46 @@
+Trend report  since 2026-11-05T15:56:34+00:00  ref master  (generated 2026-11-12T15:56:34+00:00)
+
+== Findings per tool per pipeline run  (- = no complete report from that tool)
+pipeline  time (UTC)        commit    ref     semgrep  gitleaks  grype  trivy  zap
+--------  ----------------  --------  ------  -------  --------  -----  -----  ---
+73        2026-11-12 15:47  8de4d909  master       16         1     18    118   19
+71        2026-11-12 14:33  c536ff37  master       16         1     18     62   19
+70        2026-11-12 14:19  99249432  master       16         1     18    118   93
+69        2026-11-12 14:05  99249432  master       16         1     18    118   96
+68        2026-11-12 13:47  712d1fd2  master       16         1     18    118  103
+34        2026-11-12 12:12  24115c14  master       16         1     18     56    -
+33        2026-11-12 11:25  c1fcb47c  master       16         1     18      -    -
+32        2026-11-09 19:53  c1fcb47c  master       16         1     18     94  101
+31        2026-11-09 18:58  eb27aab8  master       16         1     18     94  104
+30        2026-11-09 18:30  fb01723a  master       19         1     24   1053  107
+29        2026-11-09 18:05  1242c6c7  master       18         1     24   1053  122
+
+== Severity distribution, newest run (#73)
+tool      critical  high  medium  low  info
+--------  --------  ----  ------  ---  ----
+semgrep          0     8       8    0     0
+gitleaks         0     1       0    0     0
+grype            1     7       8    2     0
+trivy            2    37      29   50     0
+zap              0     0       4    8     7
+
+== Severity distribution, all runs in the window
+tool      critical  high  medium  low  info
+--------  --------  ----  ------  ---  ----
+semgrep          0    93      88    0     0
+gitleaks         0    11       0    0     0
+grype           11    85      92   22     0
+trivy           78   757    1037  984    28
+zap              0    11      47  391   315
+
+== Changes between runs
+#71 -> #73: 0 new, 116 recurring, 0 resolved
+not compared (no complete report in one of the runs): dockerfile:api, image:api
+tool      new  recurring  resolved
+--------  ---  ---------  --------
+gitleaks    0          1         0
+grype       0         18         0
+semgrep     0         16         0
+trivy       0         62         0
+zap         0         19         0
+
